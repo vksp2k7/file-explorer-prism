@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -49,7 +50,29 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.font.FontStyle
+import com.techflyers.compose.file.explorer.screen.main.tab.files.service.FolderLockStore
+import com.techflyers.compose.file.explorer.screen.main.tab.files.task.DeleteTimestampJournal
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import com.techflyers.compose.file.explorer.common.toFormattedSize
 import com.techflyers.compose.file.explorer.screen.main.tab.files.task.CopyTask
 import com.techflyers.compose.file.explorer.screen.main.tab.files.task.CopyTaskParameters
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.ContentHolder
@@ -64,6 +87,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -88,6 +112,7 @@ import coil3.request.ImageRequest
 import com.techflyers.compose.file.explorer.App.Companion.globalClass
 import com.techflyers.compose.file.explorer.R
 import com.techflyers.compose.file.explorer.common.emptyString
+import com.techflyers.compose.file.explorer.common.showMsg
 import com.techflyers.compose.file.explorer.common.ui.Isolate
 import com.techflyers.compose.file.explorer.common.ui.Space
 import com.techflyers.compose.file.explorer.common.ui.fastScrollbar
@@ -97,9 +122,7 @@ import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeT
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.videoFileType
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ViewConfigs
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ViewType
-import com.techflyers.compose.file.explorer.screen.preferences.constant.FileItemSizeMap.getFileListFontSize
-import com.techflyers.compose.file.explorer.screen.preferences.constant.FileItemSizeMap.getFileListIconSize
-import com.techflyers.compose.file.explorer.screen.preferences.constant.FileItemSizeMap.getFileListSpace
+import com.techflyers.compose.file.explorer.screen.preferences.constant.FileItemSizeMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -188,39 +211,315 @@ fun ColumnScope.FilesList(tab: FilesTab) {
         }
 
         if (mostRecentCopyTask != null && tab.activeFolder.canAddNewContent && tab.activeFolder !is VirtualFileHolder) {
+            var showCancelConfirmation by remember { mutableStateOf(false) }
+            var showTaskInfoDialog by remember { mutableStateOf(false) }
+
+            if (showCancelConfirmation) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showCancelConfirmation = false },
+                    title = {
+                        Text(
+                            if (mostRecentCopyTask.deleteSourceFiles)
+                                stringResource(R.string.cancel_move_task)
+                            else
+                                stringResource(R.string.cancel_copy_task)
+                        )
+                    },
+                    text = { Text(stringResource(R.string.cancel_task_confirmation)) },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            taskManager.removeTask(mostRecentCopyTask.id)
+                            showCancelConfirmation = false
+                        }) { Text(stringResource(R.string.cancel_task)) }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showCancelConfirmation = false }) {
+                            Text(stringResource(R.string.keep))
+                        }
+                    }
+                )
+            }
+
+            if (showTaskInfoDialog) {
+                val isSingleFile = mostRecentCopyTask.sourceFiles.size == 1
+                val firstFile = mostRecentCopyTask.sourceFiles.firstOrNull()
+                var renameInput by remember(mostRecentCopyTask.id) {
+                    mutableStateOf(
+                        firstFile?.let {
+                            mostRecentCopyTask.customTargetNames[it.uniquePath] ?: it.displayName
+                        } ?: ""
+                    )
+                }
+                var selectedFileForRename by remember { mutableStateOf<ContentHolder?>(null) }
+                var multiRenameInput by remember { mutableStateOf("") }
+
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showTaskInfoDialog = false },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.task_details_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    text = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (mostRecentCopyTask.deleteSourceFiles) stringResource(R.string.move) else stringResource(R.string.copy),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = " → ${tab.activeFolder.displayName}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            if (isSingleFile && firstFile != null) {
+                                Text(
+                                    text = stringResource(R.string.rename_destination_file),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                OutlinedTextField(
+                                    value = renameInput,
+                                    onValueChange = { renameInput = it },
+                                    label = { Text(stringResource(R.string.rename_file_hint)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text(
+                                    text = "Original: ${firstFile.displayName} (${firstFile.size.toFormattedSize()})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.pending_task_files, mostRecentCopyTask.sourceFiles.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 220.dp),
+                                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(mostRecentCopyTask.sourceFiles) { file ->
+                                        val customName = mostRecentCopyTask.customTargetNames[file.uniquePath]
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .clickable {
+                                                    selectedFileForRename = file
+                                                    multiRenameInput = customName ?: file.displayName
+                                                }
+                                                .padding(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = if (file.isFolder) Icons.Rounded.Folder else Icons.AutoMirrored.Rounded.InsertDriveFile,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = customName ?: file.displayName,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = if (customName != null) FontWeight.Bold else FontWeight.Normal,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                if (customName != null) {
+                                                    Text(
+                                                        text = "Orig: ${file.displayName}",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            Icon(
+                                                imageVector = Icons.Rounded.Edit,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (selectedFileForRename != null) {
+                                    HorizontalDivider()
+                                    OutlinedTextField(
+                                        value = multiRenameInput,
+                                        onValueChange = { multiRenameInput = it },
+                                        label = { Text("Rename selected file") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                                        androidx.compose.material3.TextButton(
+                                            onClick = {
+                                                selectedFileForRename?.let { f ->
+                                                    mostRecentCopyTask.setCustomTargetName(f.uniquePath, multiRenameInput)
+                                                }
+                                                selectedFileForRename = null
+                                            }
+                                        ) {
+                                            Text(stringResource(R.string.apply))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                if (isSingleFile && firstFile != null && renameInput.isNotBlank()) {
+                                    mostRecentCopyTask.setCustomTargetName(firstFile.uniquePath, renameInput)
+                                }
+                                showTaskInfoDialog = false
+                            }
+                        ) {
+                            Text(stringResource(R.string.apply))
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showTaskInfoDialog = false }) {
+                            Text(stringResource(R.string.dismiss))
+                        }
+                    }
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
                 contentAlignment = Alignment.BottomEnd
             ) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        taskManager.runTask(
-                            mostRecentCopyTask.id,
-                            CopyTaskParameters(tab.activeFolder)
-                        )
-                    },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.ContentPaste,
-                            contentDescription = null
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = if (mostRecentCopyTask.deleteSourceFiles) {
-                                stringResource(R.string.move_here)
-                            } else {
-                                stringResource(R.string.paste_here)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Task filename pill with rename capability
+                        val firstSourceFile = mostRecentCopyTask.sourceFiles.firstOrNull()
+                        val rawPendingName = firstSourceFile?.let {
+                            mostRecentCopyTask.customTargetNames[it.uniquePath] ?: it.displayName
+                        } ?: ""
+                        val taskFileNameDisplay = if (mostRecentCopyTask.sourceFiles.size > 1) {
+                            "$rawPendingName (+${mostRecentCopyTask.sourceFiles.size - 1})"
+                        } else {
+                            rawPendingName
+                        }
+
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = {
+                                PlainTooltip {
+                                    Text(rawPendingName.ifEmpty { stringResource(R.string.task_info_rename) })
+                                }
+                            },
+                            state = rememberTooltipState()
+                        ) {
+                            Surface(
+                                onClick = { showTaskInfoDialog = true },
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                shadowElevation = 3.dp,
+                                modifier = Modifier.height(40.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = stringResource(R.string.task_info_rename),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = taskFileNameDisplay,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.widthIn(max = 140.dp)
+                                    )
+                                }
                             }
-                        )
+                        }
+
+                        // Small cancel FAB
+                        androidx.compose.material3.SmallFloatingActionButton(
+                            onClick = { showCancelConfirmation = true },
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.cancel_task),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
-                )
+
+                    // Main Paste / Move Here FAB
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            taskManager.runTask(
+                                mostRecentCopyTask.id,
+                                CopyTaskParameters(tab.activeFolder)
+                            )
+                        },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.ContentPaste,
+                                contentDescription = null
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = if (mostRecentCopyTask.deleteSourceFiles) {
+                                    stringResource(R.string.move_here)
+                                } else {
+                                    stringResource(R.string.paste_here)
+                                }
+                            )
+                        }
+                    )
+                }
             }
         }
+
     }
 }
 
@@ -312,39 +611,120 @@ fun FilesListColumns(tab: FilesTab, parentFolder: ContentHolder?) {
     val context = LocalContext.current
     val selectionHighlightColor = colorScheme.surfaceContainerHigh.copy(alpha = 1f)
     val highlightColor = colorScheme.primary.copy(alpha = 0.05f)
+    val cols = maxOf(1, tab.viewConfig.columnCount)
+    // Take an immutable snapshot of the list ONCE so that all slices and the
+    // maxSiblingSize calculation operate on the same stable copy.  Using subList()
+    // on a live SnapshotStateList returns a structural view; if the IO thread
+    // clears/reloads the list while Compose iterates it, the iterator throws
+    // ConcurrentModificationException — the root cause of the repeated crashes.
+    val snapshot: List<ContentHolder> = tab.activeFolderContent.toList()
+    val totalItems = snapshot.size
+    val chunkSize = if (totalItems == 0) 1 else kotlin.math.ceil(totalItems.toDouble() / cols).toInt()
+    val columnSlices = (0 until cols).map { colIndex ->
+        val start = colIndex * chunkSize
+        val end = minOf(start + chunkSize, totalItems)
+        if (start < totalItems) snapshot.subList(start, end) else emptyList()
+    }
 
-    LazyVerticalGrid(
-        modifier = Modifier
-            .fillMaxSize()
-            .fastScrollbar(tab.activeListState),
-        state = tab.activeListState,
-        columns = GridCells.Fixed(tab.viewConfig.columnCount),
-    ) {
-        // `..` parent directory entry
-        if (parentFolder != null) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                ParentDirectoryItem(tab = tab, parentFolder = parentFolder)
+    // --- Folder size scanning for size-relative tint (optional, default Disabled) ---
+    val folderScanEnabled = globalClass.preferencesManager.folderScanForTint
+    // Keyed by uniquePath -> scanned recursive size. Populated lazily on IO as each
+    // folder's walk completes; writing into a SnapshotStateMap triggers recomposition.
+    val folderScanSizes = remember(snapshot) { mutableStateMapOf<String, Long>() }
+    if (folderScanEnabled) {
+        LaunchedEffect(snapshot) {
+            folderScanSizes.clear()
+            snapshot.forEach { item ->
+                if (item.isFolder) {
+                    launch(IO) {
+                        val scanned = when (item) {
+                            is LocalFileHolder -> {
+                                var total = 0L
+                                // Guard: walkTopDown throws AssertionError (not Exception) if the
+                                // root is not a real directory — common for root mount points like
+                                // /proc, /sys, or symlinks that report isFolder=true but aren't
+                                // actual directories on the filesystem.
+                                if (item.file.isDirectory) {
+                                    try {
+                                        item.file.walkTopDown().maxDepth(50).onFail { _, _ -> }.forEach { f ->
+                                            if (f.isFile) total += f.length()
+                                        }
+                                    } catch (_: Throwable) {} // AssertionError extends Error, not Exception
+                                }
+                                total
+                            }
+                            else -> {
+                                var total = 0L
+                                try {
+                                    suspend fun walk(holder: ContentHolder) {
+                                        holder.listContent().forEach { child ->
+                                            if (child.isFolder) walk(child) else total += child.size
+                                        }
+                                    }
+                                    walk(item)
+                                } catch (_: Throwable) {}
+                                total
+                            }
+                        }
+                        folderScanSizes[item.uniquePath] = scanned
+                    }
+                }
             }
         }
+    }
 
-        itemsIndexed(
-            tab.activeFolderContent,
-            key = { _, item -> item.uniquePath }
-        ) { index, item ->
-            val currentItemPath = item.uniquePath
-            val isAlreadySelected = tab.selectedFiles.containsKey(currentItemPath)
-            var isSelectedItem by remember(isAlreadySelected) { mutableStateOf(isAlreadySelected) }
-            ColumnFileItem(
-                item = item,
-                index = index,
-                tab = tab,
-                selectionHighlightColor = selectionHighlightColor,
-                highlightColor = highlightColor,
-                context = context,
-                viewConfigs = tab.viewConfig,
-                isSelectedItem = isSelectedItem,
-                onSelection = { isSelectedItem = it }
-            )
+    // Effective size for each item: scanned recursive size for folders (when enabled
+    // and already computed), otherwise the raw item.size (0 for folders, file length for files).
+    fun effectiveSizeOf(item: ContentHolder): Long =
+        if (folderScanEnabled && item.isFolder) folderScanSizes[item.uniquePath] ?: 0L
+        else item.size
+
+    val maxSiblingSize = snapshot.maxOfOrNull { effectiveSizeOf(it) }?.coerceAtLeast(1L) ?: 1L
+    val listStates = List(cols) { rememberLazyListState() }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (parentFolder != null) {
+            ParentDirectoryItem(tab = tab, parentFolder = parentFolder)
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            columnSlices.forEachIndexed { colIndex, slice ->
+                val listState = listStates[colIndex]
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .fastScrollbar(listState),
+                    state = listState
+                ) {
+                    itemsIndexed(
+                        slice,
+                        key = { _, item -> item.uniquePath }
+                    ) { sliceIndex, item ->
+                        val globalIndex = colIndex * chunkSize + sliceIndex
+                        val currentItemPath = item.uniquePath
+                        val isAlreadySelected = tab.selectedFiles.containsKey(currentItemPath)
+                        var isSelectedItem by remember(isAlreadySelected) { mutableStateOf(isAlreadySelected) }
+                        ColumnFileItem(
+                            item = item,
+                            index = globalIndex,
+                            tab = tab,
+                            selectionHighlightColor = selectionHighlightColor,
+                            highlightColor = highlightColor,
+                            context = context,
+                            viewConfigs = tab.viewConfig,
+                            isSelectedItem = isSelectedItem,
+                            effectiveSize = effectiveSizeOf(item),
+                            maxSiblingSize = maxSiblingSize,
+                            onSelection = { isSelectedItem = it }
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -363,6 +743,8 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?) {
             .fillMaxSize()
             .fastScrollbar(tab.activeListState)
     ) {
+        val maxSiblingSize = tab.activeFolderContent.maxOfOrNull { it.size }?.coerceAtLeast(1L) ?: 1L
+
         // `..` parent directory entry (spans full width)
         if (parentFolder != null) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -388,6 +770,7 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?) {
                 context = context,
                 viewConfigs = tab.viewConfig,
                 isSelectedItem = isSelectedItem,
+                maxSiblingSize = maxSiblingSize,
                 onSelection = { isSelectedItem = it }
             )
         }
@@ -405,6 +788,8 @@ private fun ColumnFileItem(
     context: Context,
     viewConfigs: ViewConfigs,
     isSelectedItem: Boolean,
+    effectiveSize: Long = item.size,
+    maxSiblingSize: Long = 1L,
     onSelection: (Boolean) -> Unit
 ) {
     val currentItemPath = item.uniquePath
@@ -431,6 +816,7 @@ private fun ColumnFileItem(
         }
     } else null
 
+    val tintColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     Column(
         Modifier
             .fillMaxWidth()
@@ -443,12 +829,23 @@ private fun ColumnFileItem(
                     Color.Unspecified
                 }
             )
+            .drawBehind {
+                if (!isSelected && maxSiblingSize > 0L && effectiveSize > 0L) {
+                    val fraction = (effectiveSize.toFloat() / maxSiblingSize).coerceIn(0f, 1f)
+                    drawRect(
+                        color = tintColor,
+                        size = androidx.compose.ui.geometry.Size(size.width * fraction, size.height)
+                    )
+                }
+            }
             .combinedClickable(
                 onClick = {
                     if (tab.selectedFiles.isNotEmpty()) {
                         toggleSelection()
                     } else {
-                        if (item.isFile()) {
+                        if (item.isSymbolicLink && item.isSymbolicLinkBroken) {
+                            showMsg(globalClass.getString(R.string.symbolic_link_broken))
+                        } else if (item.isFile()) {
                             tab.openFile(context, item)
                         } else {
                             tab.openFolder(item, false)
@@ -460,7 +857,7 @@ private fun ColumnFileItem(
                 }
             )
     ) {
-        Space(size = getFileListSpace(tab.activeFolder).dp)
+        Space(size = FileItemSizeMap.getSpace(viewConfigs.itemSize).dp)
 
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -468,7 +865,7 @@ private fun ColumnFileItem(
         ) {
             FileIcon(
                 item = item,
-                size = getFileListIconSize(tab.activeFolder).dp,
+                size = FileItemSizeMap.getIconSize(viewConfigs.itemSize).dp,
                 viewConfigs = viewConfigs,
                 onClick = { toggleSelection() },
                 onLongClick = { handleLongClick(tab, currentItemPath, item, index) },
@@ -478,7 +875,7 @@ private fun ColumnFileItem(
             Space(size = 8.dp)
 
             Column(Modifier.weight(1f)) {
-                val fontSize = getFileListFontSize(tab.activeFolder)
+                val fontSize = FileItemSizeMap.getFontSize(viewConfigs.itemSize)
                 // Hide extension from display name if setting is enabled
                 val prefs = globalClass.preferencesManager
                 val displayText = if (prefs.hideFileExtensions && item.isFile() && item.extension.isNotEmpty()) {
@@ -492,7 +889,6 @@ private fun ColumnFileItem(
                     isFolder = item.isFolder || (prefs.hideFileExtensions && item.isFile()),
                     isSelected = isSelected || tab.highlightedFiles.contains(currentItemPath),
                     fontSize = fontSize.sp,
-                    maxLines = 1,
                     lineHeight = (fontSize + 2).sp,
                     color = if (isSelected || tab.highlightedFiles.contains(currentItemPath)) {
                         colorScheme.primary
@@ -511,7 +907,7 @@ private fun ColumnFileItem(
             }
         }
 
-        Space(size = getFileListSpace(tab.activeFolder).dp)
+        Space(size = FileItemSizeMap.getSpace(viewConfigs.itemSize).dp)
 
         HorizontalDivider(
             modifier = Modifier.padding(start = 56.dp),
@@ -533,6 +929,7 @@ private fun GridFileItem(
     context: Context,
     viewConfigs: ViewConfigs,
     isSelectedItem: Boolean,
+    maxSiblingSize: Long = 1L,
     onSelection: (Boolean) -> Unit
 ) {
     fun toggleSelection() {
@@ -556,6 +953,7 @@ private fun GridFileItem(
         }
     } else null
 
+    val tintColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -565,7 +963,9 @@ private fun GridFileItem(
                     if (tab.selectedFiles.isNotEmpty()) {
                         toggleSelection()
                     } else {
-                        if (item.isFile()) {
+                        if (item.isSymbolicLink && item.isSymbolicLinkBroken) {
+                            showMsg(globalClass.getString(R.string.symbolic_link_broken))
+                        } else if (item.isFile()) {
                             tab.openFile(context, item)
                         } else {
                             tab.openFolder(item, false)
@@ -585,6 +985,15 @@ private fun GridFileItem(
                     Color.Unspecified
                 }
             )
+            .drawBehind {
+                if (!isSelected && maxSiblingSize > 0L && item.size > 0L) {
+                    val fraction = (item.size.toFloat() / maxSiblingSize).coerceIn(0f, 1f)
+                    drawRect(
+                        color = tintColor,
+                        size = androidx.compose.ui.geometry.Size(size.width * fraction, size.height)
+                    )
+                }
+            }
     ) {
         Column(
             modifier = Modifier
@@ -600,12 +1009,14 @@ private fun GridFileItem(
             ) {
                 FileIcon(
                     item = item,
-                    size = (getFileListIconSize(tab.activeFolder) * 1.5).dp,
+                    size = (FileItemSizeMap.getIconSize(viewConfigs.itemSize) * 1.5).dp,
                     onClick = {
                         if (tab.selectedFiles.isNotEmpty()) {
                             toggleSelection()
                         } else {
-                            if (item.isFile()) {
+                            if (item.isSymbolicLink && item.isSymbolicLinkBroken) {
+                                showMsg(globalClass.getString(R.string.symbolic_link_broken))
+                            } else if (item.isFile()) {
                                 tab.openFile(context, item)
                             } else {
                                 tab.openFolder(item, false)
@@ -645,7 +1056,7 @@ private fun GridFileItem(
                             )
                             .padding(4.dp)
                     ) {
-                        val fontSize = getFileListFontSize(tab.activeFolder) * 0.8
+                        val fontSize = FileItemSizeMap.getFontSize(viewConfigs.itemSize) * 0.8
                         MiddleEllipsisText(
                             text = item.displayName,
                             isFolder = item.isFolder,
@@ -671,7 +1082,7 @@ private fun GridFileItem(
                     text = item.displayName,
                     isFolder = item.isFolder,
                     isSelected = isSelected || tab.highlightedFiles.contains(itemPath),
-                    fontSize = (getFileListFontSize(tab.activeFolder) - 3).sp,
+                    fontSize = (FileItemSizeMap.getFontSize(viewConfigs.itemSize) - 3).sp,
                     maxLines = 2,
                     textAlign = TextAlign.Center,
                     color = if (isSelected || tab.highlightedFiles.contains(itemPath)) {
@@ -751,6 +1162,20 @@ private fun FileIcon(
                 )
             }
 
+            if (item.isSymbolicLink) {
+                val isGallery = viewConfigs.viewType == ViewType.GRID && viewConfigs.galleryMode
+                val badgeSize = if (isGallery) 22.dp else (size.value * 0.42f).coerceIn(14f, 22f).dp
+                val badgeIconSize = if (isGallery) 15.dp else (badgeSize.value * 0.72f).dp
+                SymbolicLinkBadge(
+                    isBroken = item.isSymbolicLinkBroken,
+                    modifier = Modifier
+                        .align(if (sourceInfo != null) Alignment.BottomStart else Alignment.BottomEnd)
+                        .padding(if (isGallery) 4.dp else 2.dp),
+                    badgeSize = badgeSize,
+                    iconSize = badgeIconSize
+                )
+            }
+
             if (!item.canRead) {
                 Icon(
                     modifier = Modifier
@@ -759,6 +1184,16 @@ private fun FileIcon(
                         .alpha(if (item.isHidden()) 0.4f else 1f),
                     imageVector = Icons.Rounded.Lock,
                     tint = Color.Red,
+                    contentDescription = null
+                )
+            } else if (FolderLockStore.hasLock(item.uniquePath)) {
+                Icon(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .align(if (sourceInfo != null) Alignment.TopEnd else Alignment.BottomEnd)
+                        .alpha(if (item.isHidden()) 0.4f else 1f),
+                    imageVector = Icons.Rounded.Lock,
+                    tint = MaterialTheme.colorScheme.primary,
                     contentDescription = null
                 )
             }
@@ -825,9 +1260,11 @@ private fun FileDetails(
             )
         }
         if (rightText.isNotEmpty()) {
+            val isItalic = DeleteTimestampJournal.shouldItalicize(item.uniquePath, item.lastModified)
             Text(
                 text = rightText,
                 fontSize = smallFontSize,
+                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = textColor,

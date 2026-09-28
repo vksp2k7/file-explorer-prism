@@ -5,6 +5,7 @@ import com.techflyers.compose.file.explorer.R
 import com.techflyers.compose.file.explorer.common.emptyString
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ContentCount
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileListCategory
+import com.techflyers.compose.file.explorer.screen.main.tab.files.provider.StorageProvider.getApkFiles
 import com.techflyers.compose.file.explorer.screen.main.tab.files.provider.StorageProvider.getArchiveFiles
 import com.techflyers.compose.file.explorer.screen.main.tab.files.provider.StorageProvider.getAudioFiles
 import com.techflyers.compose.file.explorer.screen.main.tab.files.provider.StorageProvider.getBookmarks
@@ -16,12 +17,17 @@ import com.techflyers.compose.file.explorer.screen.main.tab.files.provider.Stora
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
-class VirtualFileHolder(val type: Int) : ContentHolder() {
+class VirtualFileHolder(
+    val type: Int,
+    val customItems: List<ContentHolder>? = null,
+    val customTitle: String? = null
+) : ContentHolder() {
     private var fileCount = 0
     private val contentList = arrayListOf<ContentHolder>()
     private val categories = arrayListOf<String>()
 
     var selectedCategory: FileListCategory? = null
+    var selectedFormats: Set<String> = emptySet()
 
     override val displayName = when (type) {
         BOOKMARKS -> globalClass.getString(R.string.bookmarks)
@@ -32,6 +38,8 @@ class VirtualFileHolder(val type: Int) : ContentHolder() {
         DOCUMENT -> globalClass.getString(R.string.documents)
         RECENT -> globalClass.getString(R.string.recent_files)
         SEARCH -> globalClass.getString(R.string.search)
+        DUPLICATES -> customTitle ?: "Duplicates"
+        APK -> globalClass.getString(R.string.apk_and_bundles)
         else -> globalClass.getString(R.string.unknown)
     }
 
@@ -50,23 +58,19 @@ class VirtualFileHolder(val type: Int) : ContentHolder() {
     override suspend fun getParent() = null
 
     override suspend fun listSortedContent(): ArrayList<out ContentHolder> {
-        if (type == SEARCH || type == BOOKMARKS) {
+        if (type == SEARCH || type == BOOKMARKS || type == DUPLICATES) {
             return super.listSortedContent()
         }
 
         val sortingPrefs = globalClass.preferencesManager.getSortingPrefsFor(this)
-
         if (type == RECENT && sortingPrefs == globalClass.preferencesManager.getDefaultSortingPrefs()) {
             return listContent().apply {
                 if (!globalClass.preferencesManager.showHiddenFiles) {
                     removeIf { it.isHidden() }
                 }
             }
-        } else return listContent().apply {
-            if (!globalClass.preferencesManager.showHiddenFiles) {
-                removeIf { it.isHidden() }
-            }
         }
+        return super.listSortedContent()
     }
 
     override suspend fun listContent(): ArrayList<out ContentHolder> {
@@ -80,18 +84,22 @@ class VirtualFileHolder(val type: Int) : ContentHolder() {
             DOCUMENT -> getDocumentFiles(sortingPrefs)
             RECENT -> getRecentFiles()
             SEARCH -> getSearchResult()
+            DUPLICATES -> ArrayList(customItems ?: emptyList())
+            APK -> getApkFiles(sortingPrefs)
             else -> arrayListOf()
         }.also {
             contentList.apply {
                 clear()
                 addAll(it)
             }
-            if (type != BOOKMARKS) fetchCategories()
+            if (type != BOOKMARKS && type != DUPLICATES) fetchCategories()
         }
 
         return contentList.filter {
-            if (selectedCategory == null) return@filter true
-            it.uniquePath == (selectedCategory!!.data as File).path + File.separator + it.displayName
+            val categoryOk = selectedCategory == null ||
+                it.uniquePath == (selectedCategory!!.data as File).path + File.separator + it.displayName
+            val formatOk = selectedFormats.isEmpty() || it.extension.lowercase() in selectedFormats
+            categoryOk && formatOk
         }.toCollection(arrayListOf()).also { fileCount = it.size }
     }
 
@@ -108,6 +116,13 @@ class VirtualFileHolder(val type: Int) : ContentHolder() {
     }
 
     fun getCategories() = categories.map { File(it).let { FileListCategory(it.name, it) } }
+
+    fun availableFormats(): List<String> {
+        return contentList.map { it.extension.lowercase() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+    }
 
     override suspend fun findFile(name: String): ContentHolder? {
         if (contentList.isEmpty()) {
@@ -136,5 +151,7 @@ class VirtualFileHolder(val type: Int) : ContentHolder() {
         const val DOCUMENT = 5
         const val RECENT = 6
         const val SEARCH = 7
+        const val DUPLICATES = 8
+        const val APK = 9
     }
 }

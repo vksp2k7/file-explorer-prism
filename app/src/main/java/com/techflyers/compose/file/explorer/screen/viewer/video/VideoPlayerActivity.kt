@@ -23,6 +23,8 @@ import com.techflyers.compose.file.explorer.theme.FileExplorerTheme
 import java.io.File
 import kotlinx.coroutines.launch
 
+import com.techflyers.compose.file.explorer.screen.viewer.archive.ArchiveMediaQueueManager
+
 class VideoPlayerActivity : ViewerActivity() {
     private var activeInstance: VideoPlayerInstance? = null
 
@@ -39,11 +41,12 @@ class VideoPlayerActivity : ViewerActivity() {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val filter = IntentFilter("ACTION_MEDIA_CONTROL")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(pipReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(pipReceiver, filter)
-            }
+            androidx.core.content.ContextCompat.registerReceiver(
+                this,
+                pipReceiver,
+                filter,
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
         }
     }
 
@@ -51,6 +54,18 @@ class VideoPlayerActivity : ViewerActivity() {
         uri: Uri,
         uid: String
     ): ViewerInstance {
+        val archiveSession = ArchiveMediaQueueManager.getOrCreateSession(intent)
+        if (archiveSession != null && archiveSession.items.isNotEmpty()) {
+            val playlist = archiveSession.items.map { Uri.fromFile(File(it.destinationPath)) }
+            val initialIndex = intent.getIntExtra(
+                ArchiveMediaQueueManager.EXTRA_ARCHIVE_INITIAL_INDEX,
+                0
+            ).coerceIn(0, playlist.lastIndex)
+            val initialUri = playlist.getOrElse(initialIndex) { uri }
+            ArchiveMediaQueueManager.prefetchWindow(archiveSession, initialIndex, windowSize = 2)
+            return VideoPlayerInstance(initialUri, uid, playlist, archiveSession).also { activeInstance = it }
+        }
+
         val filePath = resolveFilePath(uri)
         android.util.Log.d("VideoPlayerActivity", "onCreateNewInstance: uri=$uri, resolvedPath=$filePath")
         val initialUri = if (filePath != null) Uri.fromFile(File(filePath)) else uri
@@ -205,65 +220,65 @@ class VideoPlayerActivity : ViewerActivity() {
         }
     }
 
-    /**
-     * Attempts to resolve a file:// or content:// URI to an absolute file path.
-     */
     private fun resolveFilePath(uri: Uri): String? {
-        val extraPath = intent.getStringExtra("extra_file_path")
-        if (!extraPath.isNullOrEmpty() && File(extraPath).exists()) {
-            return extraPath
-        }
+        return resolveFilePath(this, uri, intent.getStringExtra("extra_file_path"))
+    }
 
-        if (uri.scheme == "file") {
-            return uri.path
-        }
+    companion object {
+        fun resolveFilePath(context: Context, uri: Uri, extraPath: String? = null): String? {
+            if (!extraPath.isNullOrEmpty() && File(extraPath).exists()) {
+                return extraPath
+            }
 
-        if (uri.scheme == "content") {
-            try {
-                contentResolver.query(uri, arrayOf("_data"), null, null, null)?.use { cursor ->
-                    val pathIndex = cursor.getColumnIndex("_data")
-                    if (pathIndex >= 0 && cursor.moveToFirst()) {
-                        val path = cursor.getString(pathIndex)
-                        if (!path.isNullOrEmpty() && File(path).exists()) {
-                            return path
+            if (uri.scheme == "file") {
+                return uri.path
+            }
+
+            if (uri.scheme == "content") {
+                try {
+                    context.contentResolver.query(uri, arrayOf("_data"), null, null, null)?.use { cursor ->
+                        val pathIndex = cursor.getColumnIndex("_data")
+                        if (pathIndex >= 0 && cursor.moveToFirst()) {
+                            val path = cursor.getString(pathIndex)
+                            if (!path.isNullOrEmpty() && File(path).exists()) {
+                                return path
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("VideoPlayerActivity", "MediaStore query failed: ${e.message}")
+                }
+
+                val uriPath = uri.path ?: return null
+                val externalStorage = android.os.Environment.getExternalStorageDirectory().absolutePath
+
+                val prefixMappings = listOf(
+                    "/storage_root/" to "",
+                    "/root_path/" to "",
+                    "/package_root/" to externalStorage,
+                    "/external_files_path/" to externalStorage,
+                    "/external-path/" to externalStorage,
+                    "/files/" to externalStorage,
+                    "/storage/" to "/storage"
+                )
+
+                for ((prefix, basePath) in prefixMappings) {
+                    val idx = uriPath.indexOf(prefix)
+                    if (idx >= 0) {
+                        val relativePart = uriPath.substring(idx + prefix.length)
+                        val candidate = if (basePath.isEmpty()) {
+                            if (relativePart.startsWith("/")) relativePart else "/$relativePart"
+                        } else {
+                            "$basePath/$relativePart"
+                        }
+                        if (File(candidate).exists()) {
+                            return candidate
                         }
                     }
                 }
-            } catch (e: Exception) {
-                android.util.Log.w("VideoPlayerActivity", "MediaStore query failed: ${e.message}")
             }
 
-            val uriPath = uri.path ?: return null
-            val externalStorage = android.os.Environment.getExternalStorageDirectory().absolutePath
-
-            // FileProvider paths configured in provider_paths.xml:
-            // <root-path path="." name="storage_root" />
-            val prefixMappings = listOf(
-                "/storage_root/" to "",
-                "/root_path/" to "",
-                "/package_root/" to externalStorage,
-                "/external_files_path/" to externalStorage,
-                "/external-path/" to externalStorage,
-                "/files/" to externalStorage,
-                "/storage/" to "/storage"
-            )
-
-            for ((prefix, basePath) in prefixMappings) {
-                val idx = uriPath.indexOf(prefix)
-                if (idx >= 0) {
-                    val relativePart = uriPath.substring(idx + prefix.length)
-                    val candidate = if (basePath.isEmpty()) {
-                        if (relativePart.startsWith("/")) relativePart else "/$relativePart"
-                    } else {
-                        "$basePath/$relativePart"
-                    }
-                    if (File(candidate).exists()) {
-                        return candidate
-                    }
-                }
-            }
+            return null
         }
-
-        return null
     }
 }

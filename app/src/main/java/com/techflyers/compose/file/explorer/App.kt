@@ -24,6 +24,7 @@ import coil3.video.VideoFrameDecoder
 import com.techflyers.compose.file.explorer.coil.apk.ApkFileDecoder
 import com.techflyers.compose.file.explorer.coil.audio.AudioFileDecoder
 import com.techflyers.compose.file.explorer.coil.comic.ComicCoverDecoder
+import com.techflyers.compose.file.explorer.coil.document.OfficeFileDecoder
 import com.techflyers.compose.file.explorer.coil.epub.EpubCoverDecoder
 import com.techflyers.compose.file.explorer.coil.pdf.PdfFileDecoder
 import com.techflyers.compose.file.explorer.coil.zip.ZipFileFetcher
@@ -33,6 +34,8 @@ import com.techflyers.compose.file.explorer.screen.main.MainActivityManager
 import com.techflyers.compose.file.explorer.screen.main.tab.files.coil.DocumentFileMapper
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.LocalFileHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.files.search.SearchManager
+import com.techflyers.compose.file.explorer.screen.main.tab.files.search.ai.MlKitInitializer
+import com.techflyers.compose.file.explorer.screen.main.tab.files.service.RecycleBinManager
 import com.techflyers.compose.file.explorer.screen.main.tab.files.service.remote.SftpRemoteClient
 import com.techflyers.compose.file.explorer.screen.main.tab.files.task.TaskManager
 import com.techflyers.compose.file.explorer.screen.main.tab.files.zip.ZipManager
@@ -41,6 +44,7 @@ import com.techflyers.compose.file.explorer.screen.textEditor.TextEditorManager
 import com.techflyers.compose.file.explorer.screen.textEditor.keyword.KeywordManager
 import com.techflyers.compose.file.explorer.screen.viewer.ViewersManager
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
+
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
@@ -134,6 +138,17 @@ class App : Application(), coil3.SingletonImageLoader.Factory {
         appContext = this
 
         cleanOnExitDir()
+        MlKitInitializer.initialize(this)
+        initRecycleBinCleanup()
+    }
+
+    private fun initRecycleBinCleanup() {
+        if (preferencesManager.autoEmptyRecycleBin) {
+            RecycleBinManager.schedulePeriodicCleanup(this)
+            applicationScope.launch(Dispatchers.IO) {
+                RecycleBinManager.purgeExpiredFiles(preferencesManager.recycleBinRetentionDays)
+            }
+        }
     }
 
     /**
@@ -258,6 +273,7 @@ class App : Application(), coil3.SingletonImageLoader.Factory {
                 add(VideoFrameDecoder.Factory())
                 add(ApkFileDecoder.Factory())
                 add(PdfFileDecoder.Factory())
+                add(OfficeFileDecoder.Factory())
                 add(ComicCoverDecoder.Factory())
                 add(EpubCoverDecoder.Factory())
                 add(AudioFileDecoder.Factory())

@@ -21,6 +21,8 @@ import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.RecentOpe
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileSortingPrefs
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.SortingMethod.SORT_BY_NAME
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ViewConfigs
+import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ViewType
+import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.VirtualFileHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.home.data.getDefaultHomeLayout
 import com.techflyers.compose.file.explorer.screen.preferences.constant.FileItemSize
 import com.techflyers.compose.file.explorer.screen.preferences.constant.ThemePreference
@@ -56,6 +58,18 @@ class PreferencesManager {
         keyName = "enableBottomToolbar",
         defaultValue = false,
         getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
+    var selectionRibbonTwoRows by prefMutableState(
+        keyName = "selectionRibbonTwoRows",
+        defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
+    var selectionRibbonActions by prefMutableState(
+        keyName = "selectionRibbonActions",
+        defaultValue = "",
+        getPreferencesKey = { stringPreferencesKey(it) }
     )
 
     var homeTabLayout by prefMutableState(
@@ -112,6 +126,18 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var showTabsInDrawer by prefMutableState(
+        keyName = "showTabsInDrawer",
+        defaultValue = true,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
+    var showBookmarksInDrawer by prefMutableState(
+        keyName = "showBookmarksInDrawer",
+        defaultValue = true,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
 
     //---------- File List -------------//
     var itemSize by prefMutableState(
@@ -150,6 +176,19 @@ class PreferencesManager {
         getPreferencesKey = { intPreferencesKey(it) }
     )
 
+    // -1 means "same as portrait" (inherits filenameEndCharsCount)
+    var filenameEndCharsCountLandscape by prefMutableState(
+        keyName = "filenameEndCharsCountLandscape",
+        defaultValue = -1,
+        getPreferencesKey = { intPreferencesKey(it) }
+    )
+
+    var filenameMaxLines by prefMutableState(
+        keyName = "filenameMaxLines",
+        defaultValue = 1,
+        getPreferencesKey = { intPreferencesKey(it) }
+    )
+
     var showParentDirectoryEntry by prefMutableState(
         keyName = "showParentDirectoryEntry",
         defaultValue = true,
@@ -162,10 +201,22 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var folderScanForTint by prefMutableState(
+        keyName = "folderScanForTint",
+        defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     //---------- Behavior -------------//
     var showFileOptionMenuOnLongClick by prefMutableState(
         keyName = "showFileOptionMenuOnLongClick",
         defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
+    var showVideoDuration by prefMutableState(
+        keyName = "showVideoDuration",
+        defaultValue = true,
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
@@ -238,6 +289,13 @@ class PreferencesManager {
     var bookmarks by prefMutableState(
         keyName = "bookmarks",
         defaultValue = emptySet(),
+        getPreferencesKey = { stringSetPreferencesKey(it) }
+    )
+
+    // Stores the IDs of sidebar drawer sections that have been collapsed by the user.
+    var drawerCollapsedSections by prefMutableState(
+        keyName = "drawerCollapsedSections",
+        defaultValue = emptySet<String>(),
         getPreferencesKey = { stringSetPreferencesKey(it) }
     )
 
@@ -337,6 +395,19 @@ class PreferencesManager {
         defaultValue = true,
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
+
+    var autoEmptyRecycleBin by prefMutableState(
+        keyName = "autoEmptyRecycleBin",
+        defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
+    var recycleBinRetentionDays by prefMutableState(
+        keyName = "recycleBinRetentionDays",
+        defaultValue = 30,
+        getPreferencesKey = { intPreferencesKey(it) }
+    )
+
 
     var defaultOpeningMethods by prefMutableState(
         keyName = "defaultOpeningMethods",
@@ -556,14 +627,50 @@ class PreferencesManager {
         itemSize = newSize
         val current = getDefaultViewConfigPrefs()
         setDefaultViewConfigPrefs(current.copy(itemSize = newSize))
+        try {
+            globalClass.mainActivityManager.state.value.tabs.forEach { tab ->
+                if (tab is com.techflyers.compose.file.explorer.screen.main.tab.files.FilesTab) {
+                    val folderConfig = getViewConfigPrefsFor(tab.activeFolder)
+                    tab.viewConfig = folderConfig.copy(itemSize = newSize)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun reloadFromDataStore() {
+        runBlocking {
+            val currentPrefs = globalClass.prefDataStore.data.first()
+            com.techflyers.compose.file.explorer.screen.preferences.misc.reloadAllPrefMutableStates(currentPrefs)
+        }
+        try {
+            globalClass.mainActivityManager.state.value.tabs.forEach { tab ->
+                if (tab is com.techflyers.compose.file.explorer.screen.main.tab.files.FilesTab) {
+                    tab.viewConfig = getViewConfigPrefsFor(tab.activeFolder)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     fun getViewConfigPrefsFor(content: ContentHolder): ViewConfigs {
         return runBlocking {
             fromJson(
                 globalClass.prefDataStore.data.first()[stringPreferencesKey("viewConfigPrefs_${content.uniquePath}")]
-            ) ?: getDefaultViewConfigPrefs()
+            ) ?: categoryGalleryDefault(content) ?: getDefaultViewConfigPrefs()
         }
+    }
+
+    private fun categoryGalleryDefault(content: ContentHolder): ViewConfigs? {
+        val type = (content as? VirtualFileHolder)?.type ?: return null
+        if (type == VirtualFileHolder.IMAGE || type == VirtualFileHolder.VIDEO ||
+            type == VirtualFileHolder.APK || type == VirtualFileHolder.DOCUMENT
+        ) {
+            return getDefaultViewConfigPrefs().copy(
+                viewType = ViewType.GRID,
+                galleryMode = true,
+                columnCount = maxOf(getDefaultViewConfigPrefs().columnCount, 3)
+            )
+        }
+        return null
     }
 
     fun setViewConfigPrefsFor(content: ContentHolder, prefs: ViewConfigs) {

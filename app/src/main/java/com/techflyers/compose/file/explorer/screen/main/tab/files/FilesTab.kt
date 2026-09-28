@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -26,6 +27,7 @@ import com.techflyers.compose.file.explorer.common.isNot
 import com.techflyers.compose.file.explorer.common.orIf
 import com.techflyers.compose.file.explorer.common.removeIf
 import com.techflyers.compose.file.explorer.screen.main.MainActivity
+import com.techflyers.compose.file.explorer.screen.openwith.OpenWithDispatchActivity
 import com.techflyers.compose.file.explorer.screen.main.tab.Tab
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.ContentHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.LocalFileHolder
@@ -40,13 +42,16 @@ import com.techflyers.compose.file.explorer.screen.main.tab.files.state.DialogsS
 import com.techflyers.compose.file.explorer.screen.main.tab.files.task.CompressTask
 import com.techflyers.compose.file.explorer.screen.main.tab.files.task.CopyTask
 import com.techflyers.compose.file.explorer.screen.main.tab.files.task.CopyTaskParameters
+import com.techflyers.compose.file.explorer.screen.main.tab.files.shizuku.ShizukuFileHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.files.zip.ArchiveManager
 import com.reandroid.archive.ZipAlign
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -79,7 +84,7 @@ class FilesTab(
         globalClass.preferencesManager.getViewConfigPrefsFor(activeFolder)
     )
 
-    val highlightedFiles = arrayListOf<String>()
+    val highlightedFiles = mutableStateListOf<String>()
     val selectedFiles = linkedMapOf<String, ContentHolder>()
     var lastSelectedFileIndex = -1
 
@@ -90,6 +95,10 @@ class FilesTab(
     var showCategories by mutableStateOf(false)
     var categories = mutableStateListOf<FileListCategory>()
     var selectedCategory by mutableStateOf<FileListCategory?>(null)
+    var selectedFormats by mutableStateOf<Set<String>>(emptySet())
+    var pendingLockPath by mutableStateOf<String?>(null)
+    var pendingLockMode by mutableStateOf(com.techflyers.compose.file.explorer.screen.main.tab.files.ui.dialog.FolderLockDialogMode.UNLOCK)
+    var showCreateTaskDialog by mutableStateOf(false)
 
     // Holds the file that has been long-clicked
     var targetFile: ContentHolder? = null
@@ -117,6 +126,9 @@ class FilesTab(
     var filesCount by mutableIntStateOf(0)
         private set
     var selectedFilesCount by mutableIntStateOf(0)
+    var selectedFilesTotalSize by mutableLongStateOf(0L)
+    var isCalculatingSelectedSize by mutableStateOf(false)
+    private var calculateSizeJob: Job? = null
 
     init {
         // If the tab point to a file, open it immediately without waiting for its parent content to be loaded
@@ -130,29 +142,31 @@ class FilesTab(
         // Load either the source file or the home tab
         scope.launch {
             if (source.isFile()) { // This is true when locating a file
+                // Highlight the opened file
+                highlightedFiles.apply {
+                    clear()
+                    add(source.uniquePath)
+                }
+
                 // Check if we can access the parent folder and open it
                 source.getParent()?.let { parent ->
                     openFolderImpl(parent) {
                         // Scroll to the file once the content has been loaded
                         CoroutineScope(Dispatchers.Main).launch {
-                            getFileListState().scrollToItem(
-                                maxOf(
-                                    activeFolderContent.getIndexIf { uniquePath == source.uniquePath },
-                                    0
-                                ),
-                                0
-                            )
+                            val targetIndex = activeFolderContent.getIndexIf {
+                                uniquePath == source.uniquePath || (displayName == source.displayName && size == source.size)
+                            }
+                            if (targetIndex >= 0) {
+                                val listState = getFileListState()
+                                listState.scrollToItem(targetIndex, 0)
+                                kotlinx.coroutines.delay(100)
+                                listState.scrollToItem(targetIndex, 0)
+                            }
                         }
                     }
                 } ?: also {
                     // If parent folder cannot be accessed, revert to home folder
                     openFolderImpl(homeDir)
-                }
-
-                // Highlight the opened file
-                highlightedFiles.apply {
-                    clear()
-                    add(source.uniquePath)
                 }
             } else {
                 // If the source file is a folder, open it
@@ -210,22 +224,87 @@ class FilesTab(
         else -> globalClass.getString(R.string.files_tab_title)
     }
 
-    override fun onBackPressed(): Boolean {
+    val historyBackStack = mutableStateListOf<ContentHolder>()
+    val historyForwardStack = mutableStateListOf<ContentHolder>()
+    private var isNavigatingHistory = false
+
+    fun canGoBack(): Boolean = historyBackStack.isNotEmpty() || (handleBackGesture && (activeFolder as? LocalFileHolder)?.file?.parentFile != null)
+
+    fun canGoForward(): Boolean = historyForwardStack.isNotEmpty()
+
+    fun goBack(): Boolean {
         if (unselectAnySelectedFiles()) {
+            return true
+        }
+        if (historyBackStack.isNotEmpty()) {
+            val target = historyBackStack.removeAt(historyBackStack.lastIndex)
+            val current = activeFolder
+            historyForwardStack.add(current)
+            if (historyForwardStack.size > 50) {
+                historyForwardStack.removeAt(0)
+            }
+            scope.launch {
+                isNavigatingHistory = true
+                try {
+                    highlightedFiles.apply {
+                        clear()
+                        add(current.uniquePath)
+                    }
+                    openFolderImpl(target, rememberSelectedFiles = false)
+                } finally {
+                    isNavigatingHistory = false
+                }
+            }
             return true
         } else if (handleBackGesture) {
             scope.launch {
-                highlightedFiles.apply {
-                    clear()
-                    add(activeFolder.uniquePath)
+                val parent = activeFolder.getParent()
+                if (parent != null) {
+                    val current = activeFolder
+                    historyForwardStack.add(current)
+                    if (historyForwardStack.size > 50) {
+                        historyForwardStack.removeAt(0)
+                    }
+                    highlightedFiles.apply {
+                        clear()
+                        add(current.uniquePath)
+                    }
+                    isNavigatingHistory = true
+                    try {
+                        openFolderImpl(parent)
+                    } finally {
+                        isNavigatingHistory = false
+                    }
                 }
-                openFolderImpl(activeFolder.getParent()!!)
             }
+            return (activeFolder as? LocalFileHolder)?.file?.parentFile != null
+        }
+        return false
+    }
 
+    fun goForward(): Boolean {
+        if (historyForwardStack.isNotEmpty()) {
+            val target = historyForwardStack.removeAt(historyForwardStack.lastIndex)
+            val current = activeFolder
+            historyBackStack.add(current)
+            if (historyBackStack.size > 50) {
+                historyBackStack.removeAt(0)
+            }
+            scope.launch {
+                isNavigatingHistory = true
+                try {
+                    openFolderImpl(target, rememberSelectedFiles = false)
+                } finally {
+                    isNavigatingHistory = false
+                }
+            }
             return true
         }
-
         return false
+    }
+
+    override fun onBackPressed(): Boolean {
+        return goBack()
     }
 
     /**
@@ -245,6 +324,7 @@ class FilesTab(
         selectedFiles.clear()
         selectedFilesCount = 0
         lastSelectedFileIndex = -1
+        updateSelectedFilesSize()
         if (quickReload) quickReloadFiles()
     }
 
@@ -284,9 +364,28 @@ class FilesTab(
         // Prevent opening invalid files
         if (!item.isValid()) return
 
+        if (item is LocalFileHolder && com.techflyers.compose.file.explorer.screen.main.tab.files.service.FolderLockStore.isLocked(item.uniquePath)) {
+            pendingLockPath = item.uniquePath
+            pendingLockMode = com.techflyers.compose.file.explorer.screen.main.tab.files.ui.dialog.FolderLockDialogMode.UNLOCK
+            return
+        }
+
         // For virtual folders, update the category
         if (item is VirtualFileHolder) {
             item.selectedCategory = selectedCategory
+        }
+
+        if (item != activeFolder) {
+            selectedFormats = emptySet()
+        }
+
+        val previousFolder = activeFolder
+        if (!isNavigatingHistory && item.uniquePath != previousFolder.uniquePath) {
+            historyBackStack.add(previousFolder)
+            if (historyBackStack.size > 50) {
+                historyBackStack.removeAt(0)
+            }
+            historyForwardStack.clear()
         }
 
         // Switch to the new folder
@@ -308,6 +407,7 @@ class FilesTab(
         }
         withContext(Dispatchers.Main) {
             selectedFilesCount = selectedFiles.size
+            updateSelectedFilesSize()
         }
 
         // Update the bottom bar options to fit the new folder
@@ -566,6 +666,7 @@ class FilesTab(
 
             withContext(Dispatchers.Main) {
                 selectedFilesCount = selectedFiles.size
+                updateSelectedFilesSize()
 
                 // Reload the list
                 activeFolderContent.clear()
@@ -600,10 +701,85 @@ class FilesTab(
 
             withContext(Dispatchers.Main) {
                 selectedFilesCount = selectedFiles.size
+                updateSelectedFilesSize()
             }
 
             // Update title and subtitle
             requestHomeToolbarUpdate()
+        }
+    }
+
+    fun updateSelectedFilesSize() {
+        if (selectedFiles.isEmpty()) {
+            calculateSizeJob?.cancel()
+            calculateSizeJob = null
+            selectedFilesTotalSize = 0L
+            isCalculatingSelectedSize = false
+            return
+        }
+
+        val directFilesSize = selectedFiles.values.filter { !it.isFolder }.sumOf { it.size }
+        val selectedFolders = selectedFiles.values.filter { it.isFolder }.toList()
+
+        if (selectedFolders.isEmpty()) {
+            calculateSizeJob?.cancel()
+            calculateSizeJob = null
+            selectedFilesTotalSize = directFilesSize
+            isCalculatingSelectedSize = false
+            return
+        }
+
+        selectedFilesTotalSize = directFilesSize
+        isCalculatingSelectedSize = true
+        calculateSizeJob?.cancel()
+        calculateSizeJob = scope.launch(Dispatchers.IO) {
+            var totalFolderSize = 0L
+            for (folder in selectedFolders) {
+                if (!isActive) return@launch
+                when (folder) {
+                    is LocalFileHolder -> {
+                        try {
+                            folder.file.walkTopDown().maxDepth(50).onFail { _, _ -> }.forEach { f ->
+                                if (!isActive) return@launch
+                                if (f.isFile) {
+                                    totalFolderSize += f.length()
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    is ZipFileHolder -> {
+                        try {
+                            folder.node.listFilesAndEmptyDirs().forEach { child ->
+                                if (!child.isDirectory) {
+                                    totalFolderSize += child.size
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    else -> {
+                        try {
+                            suspend fun walkGeneric(holder: ContentHolder) {
+                                if (!isActive) return
+                                holder.listContent().forEach { child ->
+                                    if (!isActive) return@forEach
+                                    if (child.isFolder) {
+                                        walkGeneric(child)
+                                    } else {
+                                        totalFolderSize += child.size
+                                    }
+                                }
+                            }
+                            walkGeneric(folder)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+            if (isActive) {
+                withContext(Dispatchers.Main) {
+                    selectedFilesTotalSize = directFilesSize + totalFolderSize
+                    isCalculatingSelectedSize = false
+                }
+            }
         }
     }
 
@@ -670,9 +846,14 @@ class FilesTab(
             openFolderImpl(parent) {
                 CoroutineScope(Dispatchers.Main).launch {
                     val targetIndex =
-                        activeFolderContent.getIndexIf { uniquePath == file.uniquePath }
+                        activeFolderContent.getIndexIf {
+                            uniquePath == file.uniquePath || (displayName == file.displayName && size == file.size)
+                        }
                     if (targetIndex >= 0) {
-                        getFileListState().scrollToItem(targetIndex, 0)
+                        val listState = getFileListState()
+                        listState.scrollToItem(targetIndex, 0)
+                        kotlinx.coroutines.delay(100)
+                        listState.scrollToItem(targetIndex, 0)
                     }
                 }
             }
@@ -775,15 +956,27 @@ class FilesTab(
 
     fun addToHomeScreen(context: Context, file: LocalFileHolder) {
         val shortcutManager = context.getSystemService(ShortcutManager::class.java)
+        val targetIntent = if (file.isFolder) {
+            Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                putExtra("filePath", file.uniquePath)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        } else {
+            val fileUri = file.createUri()
+            Intent(context, OpenWithDispatchActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                setDataAndType(fileUri, file.mimeType)
+                putExtra("extra_file_path", file.file.absolutePath)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            }
+        }
         val pinShortcutInfo = ShortcutInfo
             .Builder(context, file.uniquePath)
-            .setIntent(
-                Intent(context, MainActivity::class.java).apply {
-                    action = Intent.ACTION_VIEW
-                    putExtra("filePath", file.uniquePath)
-                    flags = Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT
-                }
-            )
+            .setIntent(targetIntent)
             .setIcon(
                 android.graphics.drawable.Icon.createWithResource(
                     context,
