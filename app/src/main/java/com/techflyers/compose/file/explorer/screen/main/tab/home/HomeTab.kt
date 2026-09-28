@@ -142,7 +142,7 @@ class HomeTab : Tab() {
             ),
             HomeCategory(
                 name = globalClass.getString(R.string.apk_and_bundles),
-                icon = Icons.Rounded.Android,
+                icon = Icons.Rounded.Archive,
                 onClick = {
                     mainActivityManager.replaceCurrentTabWith(
                         FilesTab(VirtualFileHolder(VirtualFileHolder.APK))
@@ -177,5 +177,7 @@ class HomeTab : Tab() {
     fun removePinnedFile(file: LocalFileHolder) {
         pinnedFiles.remove(file)
         globalClass.preferencesManager.pinnedFiles = pinnedFiles.map { it.uniquePath }
+        globalClass.preferencesManager.pinnedFileNames =
+            globalClass.preferencesManager.pinnedFileNames - file.uniquePath
     }
 }

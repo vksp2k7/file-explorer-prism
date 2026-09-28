@@ -416,6 +416,9 @@
     <string name="pinned_files">فایل‌های سنجاق‌شده</string>
     <string name="pinned_files_desc">دسترسی سریع به فایل‌های مهم</string>
     <string name="pin_to_home_tab">سنجاق کردن به تب خانه</string>
+    <string name="rename_shortcut">تغییر نام میانبر</string>
+    <string name="remove_shortcut">حذف میانبر</string>
+    <string name="shortcut_name">نام میانبر</string>
     <string name="extensive_recent_files_scan">اسکن گسترده فایل‌های اخیر</string>
     <string name="scan_hidden_files_and_folders">اسکن فایل‌ها و پوشه‌های مخفی</string>
     <string name="manage_excluded_paths">مدیریت مسیرهای مستثنی شده</string>

@@ -480,6 +480,9 @@
     <string name="pinned_files">Pinned Files</string>
     <string name="pinned_files_desc">Quick access important files</string>
     <string name="pin_to_home_tab">Pin to home tab</string>
+    <string name="rename_shortcut">Rename shortcut</string>
+    <string name="remove_shortcut">Remove shortcut</string>
+    <string name="shortcut_name">Shortcut name</string>
     <string name="extensive_recent_files_scan">Extensive recent files scan</string>
     <string name="scan_hidden_files_and_folders">Scan hidden files and folders</string>
     <string name="hide_temp_and_db_files">Hide temporary and database files</string>

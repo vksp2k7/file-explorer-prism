@@ -417,6 +417,9 @@
     <string name="pinned_files">Sabitlenmiş Dosyalar</string>
     <string name="pinned_files_desc">Önemli dosyalara hızlı erişim</string>
     <string name="pin_to_home_tab">Ana ekrana sabitle</string>
+    <string name="rename_shortcut">Kısayolu yeniden adlandır</string>
+    <string name="remove_shortcut">Kısayolu kaldır</string>
+    <string name="shortcut_name">Kısayol adı</string>
     <string name="extensive_recent_files_scan">Kapsamlı son dosyalar taraması</string>
     <string name="scan_hidden_files_and_folders">Gizli dosyaları ve klasörleri tara</string>
     <string name="manage_excluded_paths">Hariç tutulan yolları yönet</string>

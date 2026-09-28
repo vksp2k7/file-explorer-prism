@@ -330,6 +330,17 @@ class PreferencesManager {
             pinnedFilesJson = value.toJson()
         }
 
+    private var pinnedFileNamesJson by prefMutableState(
+        keyName = "pinnedFileNamesJson",
+        defaultValue = "",
+        getPreferencesKey = { stringPreferencesKey(it) }
+    )
+    var pinnedFileNames: Map<String, String>
+        get() = fromJson<Map<String, String>>(pinnedFileNamesJson) ?: emptyMap()
+        set(value) {
+            pinnedFileNamesJson = value.toJson()
+        }
+
     var hideRootStorage by prefMutableState(
         keyName = "hideRootStorage",
         defaultValue = false,

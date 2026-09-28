@@ -426,6 +426,9 @@
     <string name="pinned_files">已固定的文件</string>
     <string name="pinned_files_desc">快速访问重要文件</string>
     <string name="pin_to_home_tab">固定到主页标签</string>
+    <string name="rename_shortcut">重命名快捷方式</string>
+    <string name="remove_shortcut">移除快捷方式</string>
+    <string name="shortcut_name">快捷方式名称</string>
     <string name="extensive_recent_files_scan">广泛扫描最近文件</string>
     <string name="scan_hidden_files_and_folders">扫描隐藏文件和文件夹</string>
     <string name="manage_excluded_paths">管理排除路径</string>

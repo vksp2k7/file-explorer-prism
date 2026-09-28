@@ -416,6 +416,9 @@
     <string name="pinned_files">Fichiers épinglés</string>
     <string name="pinned_files_desc">Accès rapide aux fichiers importants</string>
     <string name="pin_to_home_tab">Épingler à l\'onglet d\'accueil</string>
+    <string name="rename_shortcut">Renommer le raccourci</string>
+    <string name="remove_shortcut">Supprimer le raccourci</string>
+    <string name="shortcut_name">Nom du raccourci</string>
     <string name="extensive_recent_files_scan">Analyse approfondie des fichiers récents</string>
     <string name="scan_hidden_files_and_folders">Analyser les fichiers et dossiers cachés</string>
     <string name="manage_excluded_paths">Gérer les chemins exclus</string>

@@ -139,6 +139,9 @@ fun ColumnScope.FilesList(tab: FilesTab) {
     var parentFolder by remember(tab.activeFolder.uniquePath) {
         mutableStateOf<ContentHolder?>(null)
     }
+    var parentFolderResolved by remember(tab.activeFolder.uniquePath) {
+        mutableStateOf(false)
+    }
     LaunchedEffect(tab.activeFolder.uniquePath) {
         parentFolder = withContext(IO) {
             if (preferencesManager.showParentDirectoryEntry
@@ -148,6 +151,7 @@ fun ColumnScope.FilesList(tab: FilesTab) {
                 if (p != null && p.isValid() && p.canRead) p else null
             } else null
         }
+        parentFolderResolved = true
     }
 
     Box(Modifier.weight(1f)) {
@@ -159,7 +163,7 @@ fun ColumnScope.FilesList(tab: FilesTab) {
         val overscrollConfig = if (preferencesManager.disableSpringEffect) null else OverscrollConfiguration()
         CompositionLocalProvider(LocalOverscrollConfiguration provides overscrollConfig) {
         if (preferencesManager.disablePullDownToRefresh) {
-            FilesListContent(tab, parentFolder)
+            FilesListContent(tab, parentFolder, parentFolderResolved)
         } else if (preferencesManager.disableSpringEffect) {
             val noSpringState = rememberPullToRefreshState()
             PullToRefreshBox(
@@ -182,7 +186,7 @@ fun ColumnScope.FilesList(tab: FilesTab) {
                     )
                 }
             ) {
-                FilesListContent(tab, parentFolder)
+                FilesListContent(tab, parentFolder, parentFolderResolved)
             }
         } else {
             PullToRefreshBox(
@@ -197,7 +201,7 @@ fun ColumnScope.FilesList(tab: FilesTab) {
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                FilesListContent(tab, parentFolder)
+                FilesListContent(tab, parentFolder, parentFolderResolved)
             }
         }
         } // end CompositionLocalProvider
@@ -598,16 +602,24 @@ private fun LoadingOverlay(tab: FilesTab) {
 }
 
 @Composable
-private fun FilesListContent(tab: FilesTab, parentFolder: ContentHolder?) {
+private fun FilesListContent(
+    tab: FilesTab,
+    parentFolder: ContentHolder?,
+    parentFolderResolved: Boolean
+) {
     when (tab.viewConfig.viewType) {
-        ViewType.LIST -> FilesListColumns(tab, parentFolder)
-        ViewType.GRID -> FilesListGrid(tab, parentFolder)
+        ViewType.LIST -> FilesListColumns(tab, parentFolder, parentFolderResolved)
+        ViewType.GRID -> FilesListGrid(tab, parentFolder, parentFolderResolved)
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FilesListColumns(tab: FilesTab, parentFolder: ContentHolder?) {
+fun FilesListColumns(
+    tab: FilesTab,
+    parentFolder: ContentHolder?,
+    parentFolderResolved: Boolean
+) {
     val context = LocalContext.current
     val selectionHighlightColor = colorScheme.surfaceContainerHigh.copy(alpha = 1f)
     val highlightColor = colorScheme.primary.copy(alpha = 0.05f)
@@ -682,6 +694,24 @@ fun FilesListColumns(tab: FilesTab, parentFolder: ContentHolder?) {
     val maxSiblingSize = snapshot.maxOfOrNull { effectiveSizeOf(it) }?.coerceAtLeast(1L) ?: 1L
     val listStates = List(cols) { rememberLazyListState() }
 
+    LaunchedEffect(
+        tab.pendingLocateFilePath,
+        tab.activeFolder.uniquePath,
+        snapshot.size,
+        parentFolderResolved,
+        tab.viewConfig.columnCount
+    ) {
+        val path = tab.pendingLocateFilePath
+        if (path != null && parentFolderResolved) {
+            val targetIndex = snapshot.indexOfFirst { it.uniquePath == path }
+            if (targetIndex >= 0) {
+                val targetColumn = (targetIndex / chunkSize).coerceIn(0, listStates.lastIndex)
+                listStates[targetColumn].scrollToItem(targetIndex % chunkSize)
+                if (tab.pendingLocateFilePath == path) tab.pendingLocateFilePath = null
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         if (parentFolder != null) {
             ParentDirectoryItem(tab = tab, parentFolder = parentFolder)
@@ -731,10 +761,27 @@ fun FilesListColumns(tab: FilesTab, parentFolder: ContentHolder?) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?) {
+fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?, parentFolderResolved: Boolean) {
     val context = LocalContext.current
     val selectionHighlightColor = colorScheme.surfaceContainerHigh.copy(alpha = 1f)
     val highlightColor = colorScheme.primary.copy(alpha = 0.05f)
+
+    LaunchedEffect(
+        tab.pendingLocateFilePath,
+        tab.activeFolder.uniquePath,
+        tab.activeFolderContent.size,
+        parentFolder,
+        parentFolderResolved
+    ) {
+        val path = tab.pendingLocateFilePath
+        if (path != null && parentFolderResolved) {
+            val targetIndex = tab.activeFolderContent.indexOfFirst { it.uniquePath == path }
+            if (targetIndex >= 0) {
+                tab.activeListState.scrollToItem(targetIndex + if (parentFolder != null) 1 else 0)
+                if (tab.pendingLocateFilePath == path) tab.pendingLocateFilePath = null
+            }
+        }
+    }
 
     LazyVerticalGrid(
         state = tab.activeListState,

@@ -21,7 +21,6 @@ import com.techflyers.compose.file.explorer.App.Companion.globalClass
 import com.techflyers.compose.file.explorer.App.Companion.logger
 import com.techflyers.compose.file.explorer.R
 import com.techflyers.compose.file.explorer.common.emptyString
-import com.techflyers.compose.file.explorer.common.getIndexIf
 import com.techflyers.compose.file.explorer.common.getMimeType
 import com.techflyers.compose.file.explorer.common.isNot
 import com.techflyers.compose.file.explorer.common.orIf
@@ -66,6 +65,45 @@ class FilesTab(
 ) : Tab() {
     companion object {
         fun isValidLocalPath(path: String) = File(path).exists()
+
+        fun updateHomeScreenShortcutLabel(
+            context: Context,
+            file: LocalFileHolder,
+            label: String
+        ) {
+            val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return
+            if (shortcutManager.pinnedShortcuts.none { it.id == file.uniquePath }) return
+
+            val targetIntent = if (file.isFolder) {
+                Intent(context, MainActivity::class.java).apply {
+                    action = Intent.ACTION_VIEW
+                    putExtra("filePath", file.uniquePath)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+            } else {
+                val fileUri = file.createUri()
+                Intent(context, OpenWithDispatchActivity::class.java).apply {
+                    action = Intent.ACTION_VIEW
+                    setDataAndType(fileUri, file.mimeType)
+                    putExtra("extra_file_path", file.file.absolutePath)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                }
+            }
+            val updatedShortcut = ShortcutInfo.Builder(context, file.uniquePath)
+                .setIntent(targetIntent)
+                .setIcon(
+                    android.graphics.drawable.Icon.createWithResource(
+                        context,
+                        if (file.isFile()) R.mipmap.file_shortcut else R.mipmap.folder_shortcut
+                    )
+                )
+                .setShortLabel(label)
+                .build()
+            shortcutManager.updateShortcuts(listOf(updatedShortcut))
+        }
     }
 
     override val id = globalClass.generateUid()
@@ -85,6 +123,7 @@ class FilesTab(
     )
 
     val highlightedFiles = mutableStateListOf<String>()
+    var pendingLocateFilePath by mutableStateOf<String?>(null)
     val selectedFiles = linkedMapOf<String, ContentHolder>()
     var lastSelectedFileIndex = -1
 
@@ -151,18 +190,7 @@ class FilesTab(
                 // Check if we can access the parent folder and open it
                 source.getParent()?.let { parent ->
                     openFolderImpl(parent) {
-                        // Scroll to the file once the content has been loaded
-                        CoroutineScope(Dispatchers.Main).launch {
-                            val targetIndex = activeFolderContent.getIndexIf {
-                                uniquePath == source.uniquePath || (displayName == source.displayName && size == source.size)
-                            }
-                            if (targetIndex >= 0) {
-                                val listState = getFileListState()
-                                listState.scrollToItem(targetIndex, 0)
-                                kotlinx.coroutines.delay(100)
-                                listState.scrollToItem(targetIndex, 0)
-                            }
-                        }
+                        pendingLocateFilePath = source.uniquePath
                     }
                 } ?: also {
                     // If parent folder cannot be accessed, revert to home folder
@@ -818,11 +846,7 @@ class FilesTab(
 
                 reloadFiles {
                     CoroutineScope(Dispatchers.Main).launch {
-                        val newItemIndex =
-                            activeFolderContent.getIndexIf { displayName == newFile.displayName }
-                        if (newItemIndex > -1) {
-                            getFileListState().scrollToItem(newItemIndex, 0)
-                        }
+                        pendingLocateFilePath = newFile.uniquePath
                         if (openContent && !newFile.isFolder) {
                             val ctx = context ?: globalClass
                             openFile(ctx, newFile)
@@ -844,18 +868,7 @@ class FilesTab(
                 add(file.uniquePath)
             }
             openFolderImpl(parent) {
-                CoroutineScope(Dispatchers.Main).launch {
-                    val targetIndex =
-                        activeFolderContent.getIndexIf {
-                            uniquePath == file.uniquePath || (displayName == file.displayName && size == file.size)
-                        }
-                    if (targetIndex >= 0) {
-                        val listState = getFileListState()
-                        listState.scrollToItem(targetIndex, 0)
-                        kotlinx.coroutines.delay(100)
-                        listState.scrollToItem(targetIndex, 0)
-                    }
-                }
+                pendingLocateFilePath = file.uniquePath
             }
         }
     }

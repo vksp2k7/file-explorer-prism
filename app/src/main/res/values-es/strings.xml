@@ -426,6 +426,9 @@
     <string name="pinned_files">Archivos fijados</string>
     <string name="pinned_files_desc">Acceso rápido a archivos importantes</string>
     <string name="pin_to_home_tab">Fijar en pestaña de inicio</string>
+    <string name="rename_shortcut">Renombrar acceso directo</string>
+    <string name="remove_shortcut">Eliminar acceso directo</string>
+    <string name="shortcut_name">Nombre del acceso directo</string>
     <string name="extensive_recent_files_scan">Escaneo extenso de archivos recientes</string>
     <string name="scan_hidden_files_and_folders">Escanear archivos y carpetas ocultos</string>
     <string name="manage_excluded_paths">Administrar rutas excluidas</string>

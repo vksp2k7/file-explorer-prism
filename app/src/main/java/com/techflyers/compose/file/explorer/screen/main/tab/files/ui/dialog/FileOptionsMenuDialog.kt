@@ -494,6 +494,8 @@ fun FileOptionsMenuDialog(
                         onDismissRequest()
                         val oldList = globalClass.preferencesManager.pinnedFiles
                         globalClass.preferencesManager.pinnedFiles = oldList - targetFiles.map { it.uniquePath }.toSet()
+                        globalClass.preferencesManager.pinnedFileNames =
+                            globalClass.preferencesManager.pinnedFileNames - targetFiles.map { it.uniquePath }.toSet()
                         globalClass.showMsg(R.string.done)
                         tab.unselectAllFiles()
                     }

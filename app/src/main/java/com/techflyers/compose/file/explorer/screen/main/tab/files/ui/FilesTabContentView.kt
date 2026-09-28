@@ -2,12 +2,9 @@ package com.techflyers.compose.file.explorer.screen.main.tab.files.ui
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.dp
 import com.techflyers.compose.file.explorer.screen.main.tab.files.FilesTab
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.LocalFileHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.files.ui.dialog.ArchivePasswordDialog
@@ -42,7 +39,6 @@ fun ColumnScope.FilesTabContentView(tab: FilesTab) {
         BreadcrumbBar(tab)
     }
     InfoRow()
-    HorizontalDivider(modifier = Modifier, thickness = 1.dp)
     FilesList(tab)
     BottomOptionsBar(tab, forceLandscapeOverride = isLandscape)
 }
