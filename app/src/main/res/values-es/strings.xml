@@ -476,6 +476,7 @@
 
     <!-- Checksum Progress & Media Playback -->
     <string name="eta_format">Tiempo restante: %s</string>
+    <string name="auto_brightness">Automático</string>
     <string name="files_progress_format">%1$d / %2$d archivos</string>
     <string name="media_playback">Reproducción de medios</string>
     <string name="video_playback">Reproducción de video</string>

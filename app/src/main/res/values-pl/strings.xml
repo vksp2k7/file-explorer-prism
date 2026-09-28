@@ -456,6 +456,7 @@
     <string name="unpin_from_home_tab">Odepnij z karty Start</string>
     <string name="hide_hidden_files">Ukryj ukryte pliki</string>
     <string name="press_back_again">Naciśnij ponownie, aby wyjść</string>
+    <string name="auto_brightness">Automatycznie</string>
     <string name="remember_last_session_desc">jeśli włączone, karty startowe będą ignorowane</string>
     <string name="close_tab_on_back_nav">Nawigacja wsteczna do zamykania kart</string>
     <string name="remember_last_session">Zapamiętaj ostatnią sesję</string>

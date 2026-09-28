@@ -765,6 +765,7 @@
     <string name="reset_vault">Reset Vault</string>
     <string name="reset_vault_confirm">Reset Vault &amp; Folder Locks</string>
     <string name="reset_vault_warning">This will erase vault encryption keys and remove all folder locks. Files on disk will remain untouched.</string>
+    <string name="auto_brightness">Auto</string>
     <string name="eta_format">ETA: %s</string>
     <string name="files_progress_format">%1$d / %2$d files</string>
     <string name="media_playback">Media Playback</string>

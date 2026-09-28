@@ -456,6 +456,7 @@
     <string name="unpin_from_home_tab">Открепить от главной вкладки</string>
     <string name="hide_hidden_files">Скрыть скрытые файлы</string>
     <string name="press_back_again">Нажмите еще раз для выхода</string>
+    <string name="auto_brightness">Авто</string>
     <string name="remember_last_session_desc">если включено, стартовые вкладки будут игнорироваться</string>
     <string name="close_tab_on_back_nav">Навигация назад для закрытия вкладок</string>
     <string name="remember_last_session">Запомнить последнюю сессию</string>

@@ -491,6 +491,7 @@
 
     <!-- Checksum Progress & Media Playback -->
     <string name="eta_format">预计剩余时间：%s</string>
+    <string name="auto_brightness">自动</string>
     <string name="files_progress_format">%1$d / %2$d 个文件</string>
     <string name="media_playback">媒体播放</string>
     <string name="video_playback">视频播放</string>

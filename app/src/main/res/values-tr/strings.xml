@@ -457,6 +457,7 @@
     <string name="unpin_from_home_tab">Ana ekrandan sabitlemeyi kaldır</string>
     <string name="hide_hidden_files">Gizli dosyaları gizle</string>
     <string name="press_back_again">Çıkmak için tekrar basın</string>
+    <string name="auto_brightness">Otomatik</string>
     <string name="remember_last_session_desc">etkinleştirilirse, başlangıç sekmeleri yoksayılır</string>
     <string name="close_tab_on_back_nav">Sekmeleri kapatmak için geri gitme</string>
     <string name="remember_last_session">Son oturumu hatırla</string>
