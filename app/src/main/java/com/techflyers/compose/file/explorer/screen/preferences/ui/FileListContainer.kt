@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.HideSource
 import androidx.compose.material.icons.rounded.Numbers
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -261,6 +262,14 @@ fun FileListContainer() {
             icon = Icons.Rounded.Badge,
             switchState = prefs.showSourceBadges,
             onSwitchChange = { prefs.showSourceBadges = it }
+        )
+
+        PreferenceItem(
+            label = stringResource(R.string.file_size_tint),
+            supportingText = stringResource(R.string.file_size_tint_desc),
+            icon = Icons.Rounded.Palette,
+            switchState = prefs.sizeTintEnabled,
+            onSwitchChange = { prefs.sizeTintEnabled = it }
         )
 
         PreferenceItem(

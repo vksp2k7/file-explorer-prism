@@ -95,6 +95,8 @@
     <string name="format">格式</string>
     <string name="word_wrap">自动换行</string>
     <string name="read_only">只读</string>
+    <string name="lock_editor">锁定编辑器</string>
+    <string name="unlock_editor">解锁编辑器</string>
     <string name="jump_to_line">跳转到行</string>
     <string name="preferences">首选项</string>
     <string name="use_icu_selection">使用ICU选择</string>
@@ -424,6 +426,8 @@
     <string name="gallery_mode">画廊模式</string>
     <string name="crop_in_thumbnails">裁剪缩略图</string>
     <string name="pinned_files">已固定的文件</string>
+    <string name="file_size_tint">按文件大小着色</string>
+    <string name="file_size_tint_desc">根据每个项目的大小显示柔和的背景色</string>
     <string name="pinned_files_desc">快速访问重要文件</string>
     <string name="pin_to_home_tab">固定到主页标签</string>
     <string name="rename_shortcut">重命名快捷方式</string>

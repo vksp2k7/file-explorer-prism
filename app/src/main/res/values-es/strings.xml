@@ -95,6 +95,8 @@
     <string name="format">Formato</string>
     <string name="word_wrap">Ajuste de línea</string>
     <string name="read_only">Solo lectura</string>
+    <string name="lock_editor">Bloquear editor</string>
+    <string name="unlock_editor">Desbloquear editor</string>
     <string name="jump_to_line">Ir a línea</string>
     <string name="preferences">Preferencias</string>
     <string name="use_icu_selection">Usar selección ICU</string>
@@ -424,6 +426,8 @@
     <string name="gallery_mode">Modo galería</string>
     <string name="crop_in_thumbnails">Recortar en miniaturas</string>
     <string name="pinned_files">Archivos fijados</string>
+    <string name="file_size_tint">Tinte por tamaño de archivo</string>
+    <string name="file_size_tint_desc">Mostrar un sutil fondo tintado según el tamaño de cada elemento</string>
     <string name="pinned_files_desc">Acceso rápido a archivos importantes</string>
     <string name="pin_to_home_tab">Fijar en pestaña de inicio</string>
     <string name="rename_shortcut">Renombrar acceso directo</string>

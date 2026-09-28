@@ -207,6 +207,12 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var sizeTintEnabled by prefMutableState(
+        keyName = "sizeTintEnabled",
+        defaultValue = true,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     //---------- Behavior -------------//
     var showFileOptionMenuOnLongClick by prefMutableState(
         keyName = "showFileOptionMenuOnLongClick",

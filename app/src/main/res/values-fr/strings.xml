@@ -85,6 +85,8 @@
     <string name="format">Format</string>
     <string name="word_wrap">Retour à la ligne automatique</string>
     <string name="read_only">Lecture seule</string>
+    <string name="lock_editor">Verrouiller l’éditeur</string>
+    <string name="unlock_editor">Déverrouiller l’éditeur</string>
     <string name="jump_to_line">Aller à la ligne</string>
     <string name="preferences">Préférences</string>
     <string name="use_icu_selection">Utiliser la sélection ICU</string>
@@ -414,6 +416,8 @@
     <string name="gallery_mode">Mode galerie</string>
     <string name="crop_in_thumbnails">Recadrer dans les miniatures</string>
     <string name="pinned_files">Fichiers épinglés</string>
+    <string name="file_size_tint">Teinte selon la taille des fichiers</string>
+    <string name="file_size_tint_desc">Afficher une légère teinte d’arrière-plan proportionnelle à la taille de chaque élément</string>
     <string name="pinned_files_desc">Accès rapide aux fichiers importants</string>
     <string name="pin_to_home_tab">Épingler à l\'onglet d\'accueil</string>
     <string name="rename_shortcut">Renommer le raccourci</string>

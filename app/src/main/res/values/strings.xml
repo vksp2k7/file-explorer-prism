@@ -140,6 +140,8 @@
     <string name="format">Format</string>
     <string name="word_wrap">Word wrap</string>
     <string name="read_only">Read only</string>
+    <string name="lock_editor">Lock editor</string>
+    <string name="unlock_editor">Unlock editor</string>
     <string name="jump_to_line">Jump to line</string>
     <string name="preferences">Preferences</string>
     <string name="use_icu_selection">Use ICU selection</string>
@@ -639,6 +641,8 @@
     <string name="show_source_folder_badges_desc">Display originating app or folder logo on files in category views</string>
     <string name="folder_scan_for_tint">Scan folder sizes for size tint</string>
     <string name="folder_scan_for_tint_desc">Calculate total size of folders to include them in the size-relative background tint. May be slower in large directories</string>
+    <string name="file_size_tint">File size tint</string>
+    <string name="file_size_tint_desc">Show a subtle background tint based on the size of each item</string>
 
     <!-- Search Tag Filters -->
     <string name="folders">Folders</string>

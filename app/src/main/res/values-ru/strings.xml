@@ -85,6 +85,8 @@
     <string name="format">Формат</string>
     <string name="word_wrap">Перенос слов</string>
     <string name="read_only">Только чтение</string>
+    <string name="lock_editor">Заблокировать редактор</string>
+    <string name="unlock_editor">Разблокировать редактор</string>
     <string name="jump_to_line">Перейти к строке</string>
     <string name="preferences">Настройки</string>
     <string name="use_icu_selection">Использовать ICU выделение</string>
@@ -414,6 +416,8 @@
     <string name="gallery_mode">Режим галереи</string>
     <string name="crop_in_thumbnails">Обрезка в миниатюрах</string>
     <string name="pinned_files">Закрепленные файлы</string>
+    <string name="file_size_tint">Оттенок по размеру файла</string>
+    <string name="file_size_tint_desc">Показывать лёгкую фоновую заливку пропорционально размеру каждого элемента</string>
     <string name="pinned_files_desc">Быстрый доступ к важным файлам</string>
     <string name="pin_to_home_tab">Закрепить на главной вкладке</string>
     <string name="rename_shortcut">Переименовать ярлык</string>

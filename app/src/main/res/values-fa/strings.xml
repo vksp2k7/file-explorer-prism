@@ -85,6 +85,8 @@
     <string name="format">قالب</string>
     <string name="word_wrap">بستن کلمات</string>
     <string name="read_only">فقط خواندنی</string>
+    <string name="lock_editor">قفل کردن ویرایشگر</string>
+    <string name="unlock_editor">باز کردن قفل ویرایشگر</string>
     <string name="jump_to_line">رفتن به خط</string>
     <string name="preferences">تنظیمات</string>
     <string name="use_icu_selection">استفاده از انتخاب ICU</string>
@@ -414,6 +416,8 @@
     <string name="gallery_mode">حالت گالری</string>
     <string name="crop_in_thumbnails">برش در تصاویر کوچک</string>
     <string name="pinned_files">فایل‌های سنجاق‌شده</string>
+    <string name="file_size_tint">ته‌رنگ بر اساس اندازه فایل</string>
+    <string name="file_size_tint_desc">نمایش پس‌زمینه‌ای ملایم متناسب با اندازه هر مورد</string>
     <string name="pinned_files_desc">دسترسی سریع به فایل‌های مهم</string>
     <string name="pin_to_home_tab">سنجاق کردن به تب خانه</string>
     <string name="rename_shortcut">تغییر نام میانبر</string>

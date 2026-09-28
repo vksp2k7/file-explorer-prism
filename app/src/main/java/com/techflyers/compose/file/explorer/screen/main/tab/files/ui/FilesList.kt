@@ -639,7 +639,8 @@ fun FilesListColumns(
     }
 
     // --- Folder size scanning for size-relative tint (optional, default Disabled) ---
-    val folderScanEnabled = globalClass.preferencesManager.folderScanForTint
+    val sizeTintEnabled = globalClass.preferencesManager.sizeTintEnabled
+    val folderScanEnabled = sizeTintEnabled && globalClass.preferencesManager.folderScanForTint
     // Keyed by uniquePath -> scanned recursive size. Populated lazily on IO as each
     // folder's walk completes; writing into a SnapshotStateMap triggers recomposition.
     val folderScanSizes = remember(snapshot) { mutableStateMapOf<String, Long>() }
@@ -841,6 +842,7 @@ private fun ColumnFileItem(
 ) {
     val currentItemPath = item.uniquePath
     val isSelected = isSelectedItem || tab.selectedFiles.containsKey(currentItemPath)
+    val sizeTintEnabled = globalClass.preferencesManager.sizeTintEnabled
 
     fun toggleSelection() {
         if (isSelected) {
@@ -877,7 +879,7 @@ private fun ColumnFileItem(
                 }
             )
             .drawBehind {
-                if (!isSelected && maxSiblingSize > 0L && effectiveSize > 0L) {
+                if (sizeTintEnabled && !isSelected && maxSiblingSize > 0L && effectiveSize > 0L) {
                     val fraction = (effectiveSize.toFloat() / maxSiblingSize).coerceIn(0f, 1f)
                     drawRect(
                         color = tintColor,
@@ -956,10 +958,6 @@ private fun ColumnFileItem(
 
         Space(size = FileItemSizeMap.getSpace(viewConfigs.itemSize).dp)
 
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 56.dp),
-            thickness = 0.5.dp
-        )
     }
 }
 
@@ -1000,6 +998,7 @@ private fun GridFileItem(
         }
     } else null
 
+    val sizeTintEnabled = globalClass.preferencesManager.sizeTintEnabled
     val tintColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
     Box(
         modifier = Modifier
@@ -1033,7 +1032,7 @@ private fun GridFileItem(
                 }
             )
             .drawBehind {
-                if (!isSelected && maxSiblingSize > 0L && item.size > 0L) {
+                if (sizeTintEnabled && !isSelected && maxSiblingSize > 0L && item.size > 0L) {
                     val fraction = (item.size.toFloat() / maxSiblingSize).coerceIn(0f, 1f)
                     drawRect(
                         color = tintColor,

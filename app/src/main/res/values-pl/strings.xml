@@ -85,6 +85,8 @@
     <string name="format">Formatuj</string>
     <string name="word_wrap">Zawijanie wierszy</string>
     <string name="read_only">Tylko do odczytu</string>
+    <string name="lock_editor">Zablokuj edytor</string>
+    <string name="unlock_editor">Odblokuj edytor</string>
     <string name="jump_to_line">Przejdź do wiersza</string>
     <string name="preferences">Preferencje</string>
     <string name="use_icu_selection">Użyj wyboru ICU</string>
@@ -414,6 +416,8 @@
     <string name="gallery_mode">Tryb galerii</string>
     <string name="crop_in_thumbnails">Kadruj w miniaturach</string>
     <string name="pinned_files">Przypięte pliki</string>
+    <string name="file_size_tint">Odcień według rozmiaru pliku</string>
+    <string name="file_size_tint_desc">Wyświetlaj subtelne zabarwienie tła proporcjonalne do rozmiaru elementu</string>
     <string name="pinned_files_desc">Szybki dostęp do ważnych plików</string>
     <string name="pin_to_home_tab">Przypnij do karty Start</string>
     <string name="rename_shortcut">Zmień nazwę skrótu</string>
