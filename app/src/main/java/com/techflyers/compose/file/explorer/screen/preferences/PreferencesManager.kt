@@ -16,6 +16,7 @@ import com.techflyers.compose.file.explorer.common.toJson
 import com.techflyers.compose.file.explorer.screen.main.startup.StartupTabs
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.ContentHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.DefaultOpeningMethods
+import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.OpeningMethod
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.RecentOpenWithApps
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.RecentOpenWithEntry
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileSortingPrefs
@@ -24,7 +25,9 @@ import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ViewConfi
 import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.ViewType
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.VirtualFileHolder
 import com.techflyers.compose.file.explorer.screen.main.tab.home.data.getDefaultHomeLayout
+import com.techflyers.compose.file.explorer.screen.preferences.constant.DragDropAction
 import com.techflyers.compose.file.explorer.screen.preferences.constant.FileItemSize
+import com.techflyers.compose.file.explorer.screen.preferences.constant.TerminalAppPreference
 import com.techflyers.compose.file.explorer.screen.preferences.constant.ThemePreference
 import com.techflyers.compose.file.explorer.screen.preferences.misc.prefDataStore
 import com.techflyers.compose.file.explorer.screen.preferences.misc.prefMutableState
@@ -189,6 +192,12 @@ class PreferencesManager {
         getPreferencesKey = { intPreferencesKey(it) }
     )
 
+    var showFileListDivider by prefMutableState(
+        keyName = "showFileListDivider",
+        defaultValue = true,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     var showParentDirectoryEntry by prefMutableState(
         keyName = "showParentDirectoryEntry",
         defaultValue = true,
@@ -207,6 +216,12 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var deepScanCategories by prefMutableState(
+        keyName = "deepScanCategories",
+        defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     var sizeTintEnabled by prefMutableState(
         keyName = "sizeTintEnabled",
         defaultValue = true,
@@ -216,8 +231,14 @@ class PreferencesManager {
     //---------- Behavior -------------//
     var showFileOptionMenuOnLongClick by prefMutableState(
         keyName = "showFileOptionMenuOnLongClick",
-        defaultValue = false,
+        defaultValue = true,
         getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
+    var dragDropAction by prefMutableState(
+        keyName = "dragDropAction",
+        defaultValue = DragDropAction.ASK.ordinal,
+        getPreferencesKey = { intPreferencesKey(it) }
     )
 
     var showVideoDuration by prefMutableState(
@@ -432,6 +453,47 @@ class PreferencesManager {
         getPreferencesKey = { stringPreferencesKey(it) }
     )
 
+    fun getDefaultOpeningMethodsList(): List<OpeningMethod> {
+        val methods: DefaultOpeningMethods? = fromJson(defaultOpeningMethods)
+        return methods?.openingMethods ?: emptyList()
+    }
+
+    fun getDefaultOpeningMethod(extension: String): OpeningMethod? {
+        val ext = extension.lowercase().removePrefix(".")
+        return getDefaultOpeningMethodsList().firstOrNull {
+            it.extension.lowercase().removePrefix(".") == ext
+        }
+    }
+
+    fun hasDefaultOpeningMethod(extension: String): Boolean {
+        return getDefaultOpeningMethod(extension) != null
+    }
+
+    fun setDefaultOpeningMethod(extension: String, packageName: String, className: String) {
+        val ext = extension.lowercase().removePrefix(".")
+        val current = getDefaultOpeningMethodsList().filter {
+            it.extension.lowercase().removePrefix(".") != ext
+        }
+        val updated = current + OpeningMethod(
+            extension = ext,
+            packageName = packageName,
+            className = className
+        )
+        defaultOpeningMethods = DefaultOpeningMethods(updated).toJson()
+    }
+
+    fun clearDefaultOpeningMethod(extension: String) {
+        val ext = extension.lowercase().removePrefix(".")
+        val current = getDefaultOpeningMethodsList().filter {
+            it.extension.lowercase().removePrefix(".") != ext
+        }
+        defaultOpeningMethods = DefaultOpeningMethods(current).toJson()
+    }
+
+    fun clearAllDefaultOpeningMethods() {
+        defaultOpeningMethods = DefaultOpeningMethods(emptyList()).toJson()
+    }
+
     var recentOpenWithApps by prefMutableState(
         keyName = "recentOpenWithApps",
         defaultValue = RecentOpenWithApps().toJson(),
@@ -587,6 +649,25 @@ class PreferencesManager {
     var customCodeRunners by prefMutableState(
         keyName = "customCodeRunners",
         defaultValue = "{}",
+        getPreferencesKey = { stringPreferencesKey(it) }
+    )
+
+    //---------- Terminal -------------//
+    var terminalApp by prefMutableState(
+        keyName = "terminalApp",
+        defaultValue = TerminalAppPreference.BUILT_IN.ordinal,
+        getPreferencesKey = { intPreferencesKey(it) }
+    )
+
+    var customTerminalPackage by prefMutableState(
+        keyName = "customTerminalPackage",
+        defaultValue = "com.termux",
+        getPreferencesKey = { stringPreferencesKey(it) }
+    )
+
+    var customTerminalCommand by prefMutableState(
+        keyName = "customTerminalCommand",
+        defaultValue = "cd {dir}",
         getPreferencesKey = { stringPreferencesKey(it) }
     )
 

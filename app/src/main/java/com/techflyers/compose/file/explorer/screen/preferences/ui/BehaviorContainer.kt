@@ -15,6 +15,8 @@ import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VideoFile
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material.icons.rounded.Folder
+import com.techflyers.compose.file.explorer.screen.preferences.constant.DragDropAction
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -22,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,13 +44,65 @@ import com.techflyers.compose.file.explorer.common.emptyString
 fun BehaviorContainer() {
     val prefs = globalClass.preferencesManager
 
+    val defaultOpeningMethodsList = prefs.getDefaultOpeningMethodsList()
+    var showDefaultAppsDialog by remember { mutableStateOf(false) }
+
+    DefaultAppsDialog(
+        show = showDefaultAppsDialog,
+        onDismissRequest = { showDefaultAppsDialog = false }
+    )
+
     Container(title = stringResource(R.string.behavior)) {
+        PreferenceItem(
+            label = stringResource(R.string.default_opening_methods),
+            supportingText = if (defaultOpeningMethodsList.isNotEmpty()) {
+                stringResource(R.string.default_opening_methods_count, defaultOpeningMethodsList.size)
+            } else {
+                stringResource(R.string.no_default_opening_methods)
+            },
+            icon = Icons.Rounded.OpenInBrowser,
+            onClick = { showDefaultAppsDialog = true }
+        )
+
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            thickness = 3.dp
+        )
+
         PreferenceItem(
             label = stringResource(R.string.show_files_options_menu_on_long_click),
             supportingText = emptyString,
             icon = Icons.Rounded.TouchApp,
             switchState = prefs.showFileOptionMenuOnLongClick,
             onSwitchChange = { prefs.showFileOptionMenuOnLongClick = it }
+        )
+
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            thickness = 3.dp
+        )
+
+        PreferenceItem(
+            label = stringResource(R.string.drag_and_drop_action),
+            supportingText = when (prefs.dragDropAction) {
+                DragDropAction.ALWAYS_MOVE.ordinal -> stringResource(R.string.drag_drop_move)
+                DragDropAction.ALWAYS_COPY.ordinal -> stringResource(R.string.drag_drop_copy)
+                else -> stringResource(R.string.drag_drop_ask)
+            },
+            icon = Icons.Rounded.Folder,
+            onClick = {
+                prefs.singleChoiceDialog.show(
+                    title = globalClass.getString(R.string.drag_and_drop_action),
+                    description = globalClass.getString(R.string.drag_and_drop_action_desc),
+                    choices = listOf(
+                        globalClass.getString(R.string.drag_drop_ask),
+                        globalClass.getString(R.string.drag_drop_copy),
+                        globalClass.getString(R.string.drag_drop_move)
+                    ),
+                    selectedChoice = prefs.dragDropAction,
+                    onSelect = { prefs.dragDropAction = it }
+                )
+            }
         )
 
         HorizontalDivider(

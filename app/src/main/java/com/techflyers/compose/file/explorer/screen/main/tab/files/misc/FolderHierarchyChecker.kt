@@ -12,16 +12,12 @@ object FolderHierarchyChecker {
      */
     fun hasAnyFilesRecursively(
         dir: File,
-        maxDepth: Int = 15,
+        maxDepth: Int = 5,
         visited: MutableSet<String> = mutableSetOf()
     ): Boolean {
-        if (maxDepth <= 0) return false
-        val canonical = try {
-            dir.canonicalPath
-        } catch (_: Exception) {
-            dir.absolutePath
-        }
-        if (!visited.add(canonical)) return false
+        if (maxDepth <= 0 || visited.size > 50) return false
+        val path = dir.absolutePath
+        if (!visited.add(path)) return false
 
         val children = dir.listFiles() ?: return false
         for (child in children) {
@@ -48,7 +44,7 @@ object FolderHierarchyChecker {
         // Must have at least one subdirectory directly or nested
         val children = dir.listFiles() ?: return false
         val subDirs = children.filter { it.isDirectory && it.name != "metadata.json" }
-        if (subDirs.isEmpty()) {
+        if (subDirs.isEmpty() || subDirs.size > 20) {
             emptyWithinCache.put(cacheKey, false)
             return false
         }
@@ -58,6 +54,21 @@ object FolderHierarchyChecker {
         val isEmptyWithin = !hasFiles
         emptyWithinCache.put(cacheKey, isEmptyWithin)
         return isEmptyWithin
+    }
+
+    /**
+     * Checks if targetPath is the same as sourcePath or is a descendant subdirectory of sourcePath.
+     * Prevents moving/copying a directory into itself or into one of its subdirectories.
+     */
+    fun isChildOrSame(targetPath: String, sourcePath: String): Boolean {
+        if (targetPath == sourcePath) return true
+        return try {
+            val normTarget = File(targetPath).canonicalPath
+            val normSource = File(sourcePath).canonicalPath
+            normTarget == normSource || normTarget.startsWith(normSource + File.separator)
+        } catch (_: Exception) {
+            targetPath == sourcePath || targetPath.startsWith(sourcePath + File.separator)
+        }
     }
 
     fun clearCache() {

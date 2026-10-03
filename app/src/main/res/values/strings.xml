@@ -80,6 +80,8 @@
     <string name="open_with">Open with</string>
     <string name="share">Share</string>
     <string name="add_to_home_screen">Add to home screen</string>
+    <string name="show_file_list_divider">Show file list separator</string>
+    <string name="show_file_list_divider_desc">Show separator lines between items in the file list</string>
     <string name="edit_with_text_editor">Edit with text editor</string>
     <string name="compress">Compress</string>
     <string name="selected">selected</string>
@@ -346,6 +348,9 @@
     <string name="unknown_album">Unknown Album</string>
     <string name="volume">Volume</string>
     <string name="equalizer">Equalizer</string>
+    <string name="open_device_equalizer">System Equalizer</string>
+    <string name="no_equalizer_found">No system equalizer found on this device</string>
+    <string name="no_direct_equalizer_opening_sound_settings">Opening device sound settings</string>
     <string name="reset">Reset</string>
     <string name="done">Done</string>
     <string name="title_activity_logs">Logs</string>
@@ -455,6 +460,17 @@
     <string name="title_activity_video_player">Video Player</string>
     <string name="set_as_default_for_this_type">Set as default for this type</string>
     <string name="remove_default_opening_method">Remove default opening method</string>
+    <string name="clear_default">Clear default</string>
+    <string name="default_tag">Default</string>
+    <string name="current_default_app">Default: %1$s</string>
+    <string name="default_for_extension">Always opens .%1$s files</string>
+    <string name="default_opening_methods">Default apps</string>
+    <string name="default_opening_methods_desc">Manage default applications for file types</string>
+    <string name="default_opening_methods_count">%1$d file type(s) configured</string>
+    <string name="no_default_opening_methods">No default apps set</string>
+    <string name="clear_all_defaults">Clear all</string>
+    <string name="default_cleared_for">Default cleared for .%1$s</string>
+    <string name="all_defaults_cleared">All default apps cleared</string>
     <string name="toggle_hidden_files">Toggle hidden files</string>
     <string name="custom">Custom</string>
     <string name="file_list_display_mode">Files display mode</string>
@@ -622,6 +638,31 @@
     <string name="no_custom_runners">No custom runners configured</string>
     <string name="delete_runner">Delete runner</string>
     <string name="terminal_rootfs_missing">Terminal environment is corrupted. Please reinstall from Settings → Terminal.</string>
+    <string name="open_in_terminal">Open in Terminal</string>
+    <string name="terminal_app">Terminal application</string>
+    <string name="select_terminal_app_desc">Choose which terminal to use when opening folders</string>
+    <string name="terminal_app_builtin">Built-in (Ubuntu / PRoot)</string>
+    <string name="terminal_app_termux">Termux</string>
+    <string name="terminal_app_custom">Custom app</string>
+    <string name="termux_integration">Termux integration</string>
+    <string name="termux_installed">Termux is installed</string>
+    <string name="termux_not_installed">Termux is not installed (tap to download)</string>
+    <string name="termux_not_installed_error">Termux is not installed. Please install Termux from F-Droid or GitHub.</string>
+    <string name="termux_setup_info">Prism sends commands directly to Termux via RUN_COMMAND and opens the target folder.\n\nFor automatic command execution in Termux:\n1. Set \'allow-external-apps=true\' in ~/.termux/termux.properties\n2. In Android Settings → Apps → Prism → Permissions, allow \"Run commands in Termux environment\".</string>
+    <string name="termux_permission_status">Command execution permission</string>
+    <string name="termux_permission_granted">Permission granted (direct execution enabled)</string>
+    <string name="termux_permission_not_granted">Permission not granted (tap to configure)</string>
+    <string name="termux_permission_granted_toast">Termux command permission granted!</string>
+    <string name="termux_permission_copy_notice">Grant \'Run commands in Termux\' in Settings for direct execution. Command copied to clipboard!</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="custom_terminal_package">Custom terminal package</string>
+    <string name="custom_terminal_package_desc">Package name of the terminal or external app to launch (e.g. com.termux, jackpal.androidterm)</string>
+    <string name="custom_terminal_command">Command template</string>
+    <string name="custom_terminal_command_desc">Command to run in the terminal. Use {dir} or {path} for folder path.</string>
+    <string name="opening_termux">Opening Termux…</string>
+    <string name="opening_terminal">Opening %1$s…</string>
+    <string name="terminal_package_not_installed">%1$s is not installed</string>
+    <string name="builtin_terminal_env">Built-in Ubuntu environment</string>
 
     <!-- File Picker & Open With Strings -->
     <string name="file_picker_title">Prism File Picker</string>
@@ -770,4 +811,15 @@
     <string name="files_progress_format">%1$d / %2$d files</string>
     <string name="media_playback">Media Playback</string>
     <string name="video_playback">Video Playback</string>
+    <string name="deep_scan_categories">Deep scan for categories</string>
+    <string name="deep_scan_categories_desc">Scan local storage tree in the background for media files not indexed by Android MediaStore</string>
+    <string name="drag_and_drop_action">Drag &amp; drop action</string>
+    <string name="drag_and_drop_action_desc">Default action when dropping items onto breadcrumb folders</string>
+    <string name="drag_drop_ask">Always ask</string>
+    <string name="drag_drop_copy">Always copy</string>
+    <string name="drag_drop_move">Always move</string>
+    <string name="cannot_move_into_self">Cannot move folder into itself or its subdirectory</string>
+    <string name="move_or_copy_title">Move or Copy?</string>
+    <string name="move_or_copy_message">Do you want to move or copy %1$d items to %2$s?</string>
+    <string name="move_or_copy_message_single">Do you want to move or copy \"%1$s\" to %2$s?</string>
 </resources>
