@@ -753,7 +753,7 @@ fun FilesListColumns(
                         (itemBottom - safeBottom).coerceAtLeast(0f)
                     } else 0f
 
-                    delay(60)
+                    delay(16)
 
                     val visibleItem = listState.layoutInfo.visibleItemsInfo.find { it.index == sliceIndex }
                     val currentViewport = listState.layoutInfo.viewportSize.height.toFloat()
@@ -1001,7 +1001,7 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?, parentFolderResol
                         (itemBottom - safeBottom).coerceAtLeast(0f)
                     } else 0f
 
-                    delay(60)
+                    delay(16)
 
                     val visibleItem = tab.activeListState.layoutInfo.visibleItemsInfo.find { it.index == gridIndex }
                     val currentViewport = tab.activeListState.layoutInfo.viewportSize.height.toFloat()
@@ -1162,7 +1162,7 @@ private fun ColumnFileItem(
                     } else if (item.isFile()) {
                         tab.openFile(context, item)
                     } else {
-                        tab.openFolder(item, false)
+                        tab.openFolder(item)
                     }
                 }
             }
@@ -1277,7 +1277,7 @@ private fun GridFileItem(
                     } else if (item.isFile()) {
                         tab.openFile(context, item)
                     } else {
-                        tab.openFolder(item, false)
+                        tab.openFolder(item)
                     }
                 }
             }
@@ -1326,7 +1326,7 @@ private fun GridFileItem(
                             } else if (item.isFile()) {
                                 tab.openFile(context, item)
                             } else {
-                                tab.openFolder(item, false)
+                                tab.openFolder(item)
                             }
                         }
                     },

@@ -44,6 +44,12 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var hasCompletedBatteryOptimizationPrompt by prefMutableState(
+        keyName = "hasCompletedBatteryOptimizationPrompt",
+        defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     //---------- Appearance -------------//
     var theme by prefMutableState(
         keyName = "theme",

@@ -290,7 +290,7 @@ fun NFileDrawerContent(
                         icon = Icons.Rounded.VpnKey,
                         label = "Private Wallet"
                     ) {
-                        manager.replaceCurrentTabWith(VaultTab())
+                        manager.openToolInNewTab(VaultTab())
                         onNavigate()
                     }
 
@@ -314,7 +314,7 @@ fun NFileDrawerContent(
                         icon = Icons.Rounded.PieChart,
                         label = stringResource(R.string.storage_analysis)
                     ) {
-                        manager.replaceCurrentTabWith(StorageAnalysisTab())
+                        manager.openToolInNewTab(StorageAnalysisTab())
                         onNavigate()
                     }
 
@@ -322,7 +322,7 @@ fun NFileDrawerContent(
                         icon = Icons.Rounded.Difference,
                         label = stringResource(R.string.duplicate_finder)
                     ) {
-                        manager.replaceCurrentTabWith(DuplicateFinderTab())
+                        manager.openToolInNewTab(DuplicateFinderTab())
                         onNavigate()
                     }
                 } // end Tools section

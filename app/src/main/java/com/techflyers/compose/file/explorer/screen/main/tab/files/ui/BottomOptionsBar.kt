@@ -508,7 +508,7 @@ fun RowScope.BottomOptionsBarButton(
         Icon(
             modifier = Modifier.size(20.dp),
             imageVector = imageVector,
-            contentDescription = null
+            contentDescription = text
         )
 
         Space(size = 4.dp)

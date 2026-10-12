@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: GitHub Discussions (Q&A and Ideas)
+    url: https://github.com/techflyers/Prism-File-Explorer/discussions
+    about: Use Discussions for open-ended questions, support, and early ideas. Reserve Issues for bugs and scoped feature work.
+  - name: Project README
+    url: https://github.com/techflyers/Prism-File-Explorer#readme
+    about: Feature overview, build instructions, and contribution pointers.

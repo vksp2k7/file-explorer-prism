@@ -717,35 +717,31 @@ fun MoreOptionsButton(modifier: Modifier = Modifier) {
                     )
                 }
 
-                // Tasks panel
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.tasks)) },
-                    onClick = {
-                        activeTab.toggleTasksPanel(true)
-                        showOptionsMenu = false
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.AddTask,
-                            contentDescription = null
-                        )
-                    }
-                )
-
-                // Bookmarks
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.bookmarks)) },
-                    onClick = {
-                        activeTab.toggleBookmarksDialog(true)
-                        showOptionsMenu = false
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Bookmark,
-                            contentDescription = null
-                        )
-                    }
-                )
+                val bottomToolbarVisible = globalClass.preferencesManager.enableBottomToolbar
+                val inSelection = activeTab.selectedFiles.isNotEmpty()
+                val showTasksBookmarksInOverflow = !bottomToolbarVisible || inSelection || isRecycleBin
+                if (showTasksBookmarksInOverflow) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.tasks)) },
+                        onClick = {
+                            activeTab.toggleTasksPanel(true)
+                            showOptionsMenu = false
+                        },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Rounded.AddTask, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.bookmarks)) },
+                        onClick = {
+                            activeTab.toggleBookmarksDialog(true)
+                            showOptionsMenu = false
+                        },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Rounded.Bookmark, contentDescription = null)
+                        }
+                    )
+                }
 
                 HorizontalDivider()
 

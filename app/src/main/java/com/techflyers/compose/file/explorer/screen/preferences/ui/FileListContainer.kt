@@ -286,14 +286,6 @@ fun FileListContainer() {
         )
 
         PreferenceItem(
-            label = stringResource(R.string.file_size_tint),
-            supportingText = stringResource(R.string.file_size_tint_desc),
-            icon = Icons.Rounded.Palette,
-            switchState = prefs.sizeTintEnabled,
-            onSwitchChange = { prefs.sizeTintEnabled = it }
-        )
-
-        PreferenceItem(
             label = stringResource(R.string.folder_scan_for_tint),
             supportingText = stringResource(R.string.folder_scan_for_tint_desc),
             icon = Icons.Rounded.FolderOpen,

@@ -131,8 +131,28 @@ class FilesTab(
     private var lastKnownCategoryMaxDate: Long = -1L
 
     fun updateContentSnapshot() {
-        contentSnapshot = activeFolderContent.toList()
-        maxSiblingSize = activeFolderContent.maxOfOrNull { it.size }?.coerceAtLeast(1L) ?: 1L
+        val filtered = if (typeFilter != null) {
+            activeFolderContent.filter { item ->
+                item.isFolder() || matchesTypeFilterExtension(item.extension, typeFilter)
+            }
+        } else {
+            activeFolderContent.toList()
+        }
+        contentSnapshot = filtered
+        maxSiblingSize = filtered.maxOfOrNull { it.size }?.coerceAtLeast(1L) ?: 1L
+    }
+
+    private fun matchesTypeFilterExtension(ext: String, filter: String?): Boolean {
+        if (filter == null) return true
+        val e = ext.lowercase()
+        return when (filter) {
+            "image" -> e in com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.imageFileType
+            "video" -> e in com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.videoFileType
+            "audio" -> e in com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.audioFileType
+            "document" -> e in com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.documentFileType
+            "archive" -> e in com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.archiveFileType
+            else -> true
+        }
     }
 
     val contentListStates = hashMapOf<String, LazyGridState>()
@@ -201,6 +221,8 @@ class FilesTab(
     var categories = mutableStateListOf<FileListCategory>()
     var selectedCategory by mutableStateOf<FileListCategory?>(null)
     var selectedFormats by mutableStateOf<Set<String>>(emptySet())
+    /** Type filter for ordinary folders: null=All, or image/video/audio/document/archive (#75) */
+    var typeFilter by mutableStateOf<String?>(null)
     var pendingLockPath by mutableStateOf<String?>(null)
     var pendingLockMode by mutableStateOf(com.techflyers.compose.file.explorer.screen.main.tab.files.ui.dialog.FolderLockDialogMode.UNLOCK)
     var showCreateTaskDialog by mutableStateOf(false)
@@ -595,8 +617,11 @@ class FilesTab(
         rememberSelectedFiles: Boolean = false,
         postEvent: () -> Unit = {}
     ) {
-        // Block UI
-        if (isLoading) return
+        // Latest-request-wins: cancel in-flight listing so Home/navigation is not dropped (#78)
+        if (isLoading) {
+            listingJob?.cancel()
+            isLoading = false
+        }
 
         // Prevent opening invalid files
         if (!item.isValid()) return
@@ -614,6 +639,7 @@ class FilesTab(
 
         if (item != activeFolder) {
             selectedFormats = emptySet()
+            typeFilter = null
         }
 
         val previousFolder = activeFolder

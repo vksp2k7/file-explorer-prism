@@ -3,6 +3,9 @@ package com.techflyers.compose.file.explorer.screen.main
 import android.content.Intent
 import android.os.Bundle
 import android.os.Environment
+import android.os.PowerManager
+import android.provider.Settings
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -22,6 +25,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -115,6 +121,52 @@ class MainActivity : BaseActivity() {
                             }
                         )
                         return@SafeSurface
+                    }
+
+                    var showBatteryPrompt by remember { mutableStateOf(false) }
+                    LaunchedEffect(onboardingDone) {
+                        if (onboardingDone && !globalClass.preferencesManager.hasCompletedBatteryOptimizationPrompt) {
+                            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                            val ignoring = try {
+                                pm?.isIgnoringBatteryOptimizations(packageName) == true
+                            } catch (_: Exception) { true }
+                            if (ignoring) {
+                                globalClass.preferencesManager.hasCompletedBatteryOptimizationPrompt = true
+                            } else {
+                                showBatteryPrompt = true
+                            }
+                        }
+                    }
+                    if (showBatteryPrompt) {
+                        AlertDialog(
+                            onDismissRequest = {
+                                globalClass.preferencesManager.hasCompletedBatteryOptimizationPrompt = true
+                                showBatteryPrompt = false
+                            },
+                            title = { Text("Battery optimization") },
+                            text = { Text("For reliable background file operations, you can allow the app to ignore battery optimizations. This is optional.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    globalClass.preferencesManager.hasCompletedBatteryOptimizationPrompt = true
+                                    showBatteryPrompt = false
+                                    try {
+                                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                    } catch (_: Exception) {
+                                        try {
+                                            startActivity(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS))
+                                        } catch (_: Exception) {
+                                            showMsg("Open system Settings → Battery to review optimization for this app.")
+                                        }
+                                    }
+                                }) { Text("Review settings") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    globalClass.preferencesManager.hasCompletedBatteryOptimizationPrompt = true
+                                    showBatteryPrompt = false
+                                }) { Text("Don't remind again") }
+                            }
+                        )
                     }
 
                     val coroutineScope = rememberCoroutineScope()

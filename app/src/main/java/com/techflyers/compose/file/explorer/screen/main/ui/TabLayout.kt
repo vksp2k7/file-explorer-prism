@@ -281,6 +281,26 @@ fun OptionsMenu(
     onDismiss: () -> Unit,
     onShowClosedTabsHistory: () -> Unit = {}
 ) {
+    var showCloseOthersConfirm by remember { mutableStateOf(false) }
+    if (showCloseOthersConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCloseOthersConfirm = false },
+            title = { Text(text = stringResource(R.string.close_others)) },
+            text = { Text(text = "Close all other tabs? The current tab will remain open.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    globalClass.mainActivityManager.removeOtherTabs(index)
+                    showCloseOthersConfirm = false
+                    onDismiss()
+                }) { Text("Close others") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloseOthersConfirm = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
     DropdownMenu(
         expanded = true,
         onDismissRequest = onDismiss,
@@ -380,10 +400,7 @@ fun OptionsMenu(
 
         DropdownMenuItem(
             text = { Text(text = stringResource(R.string.close_others)) },
-            onClick = {
-                globalClass.mainActivityManager.removeOtherTabs(index)
-                onDismiss()
-            }
+            onClick = { showCloseOthersConfirm = true }
         )
 
         DropdownMenuItem(

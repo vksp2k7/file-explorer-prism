@@ -80,6 +80,7 @@ fun BreadcrumbBar(tab: FilesTab) {
             FormatRibbon(tab)
         }
     } else if (tab.activeFolder !is VirtualFileHolder) {
+        TypeFilterRibbon(tab)
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically

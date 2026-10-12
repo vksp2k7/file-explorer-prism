@@ -93,7 +93,14 @@ fun StorageDeviceView(
                         modifier = Modifier
                             .alpha(0.8f)
                             .weight(1f),
-                        text = "${storageDevice.usedSize.toFormattedSize()}/${storageDevice.totalSize.toFormattedSize()}",
+                        text = run {
+                            val free = (storageDevice.totalSize - storageDevice.usedSize).coerceAtLeast(0L)
+                            if (storageDevice.totalSize > 0) {
+                                "${free.toFormattedSize()} free · ${storageDevice.usedSize.toFormattedSize()}/${storageDevice.totalSize.toFormattedSize()}"
+                            } else {
+                                "Unavailable"
+                            }
+                        },
                         fontSize = 12.sp,
                         textAlign = TextAlign.End,
                         color = if (progress > 0.85f) {

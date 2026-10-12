@@ -284,6 +284,16 @@ class MainActivityManager {
         }
     }
 
+
+    /** Opens a tool tab in a new tab with parentTab set for Back (#70). */
+    fun openToolInNewTab(tab: Tab) {
+        val origin = getActiveTab()
+        if (origin != null && origin !== tab) {
+            tab.parentTab = origin
+        }
+        addTabAndSelect(tab)
+    }
+
     fun selectTabAt(index: Int, skipTabRefresh: Boolean = false) {
         // Validate the index
         val validatedIndex = if (index isNot -1) {
@@ -468,10 +478,16 @@ class MainActivityManager {
             return false
         }
 
-        // Replace with parent tab if exists
-        if (getActiveTab()!!.parentTab != null) {
-            replaceCurrentTabWith(getActiveTab()!!.parentTab!!, false)
-            return false
+        // Replace with parent tab; resolve by stable id if object was closed/reordered (#70)
+        val activeForParent = getActiveTab()!!
+        val parent = activeForParent.parentTab
+        if (parent != null) {
+            val target = _state.value.tabs.firstOrNull { it === parent || it.id == parent.id }
+            if (target != null) {
+                replaceCurrentTabWith(target, false)
+                return false
+            }
+            activeForParent.parentTab = null
         }
 
         // Replace the active tab with the home tab (if turned on in settings)
@@ -778,13 +794,14 @@ class MainActivityManager {
     }
 
     fun reorderTabs(from: Int, to: Int) {
-        _state.update {
-            it.copy(
-                tabs = _state.value.tabs.toMutableList().apply {
-                    add(to, removeAt(from))
-                },
-                selectedTabIndex = _state.value.tabs.indexOf(getActiveTab())
-            )
+        val active = getActiveTab()
+        _state.update { state ->
+            val newTabs = state.tabs.toMutableList().apply {
+                add(to, removeAt(from))
+            }
+            val newSelected = active?.let { t -> newTabs.indexOf(t).takeIf { it >= 0 } }
+                ?: state.selectedTabIndex.coerceIn(0, newTabs.lastIndex.coerceAtLeast(0))
+            state.copy(tabs = newTabs, selectedTabIndex = newSelected)
         }
     }
 
