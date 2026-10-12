@@ -161,6 +161,12 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var showDirectoryTypeFilterRibbon by prefMutableState(
+        keyName = "showDirectoryTypeFilterRibbon",
+        defaultValue = true,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     var deepEmptyFolderCheck by prefMutableState(
         keyName = "deepEmptyFolderCheck",
         defaultValue = false,

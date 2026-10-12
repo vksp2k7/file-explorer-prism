@@ -155,6 +155,13 @@ fun ColumnScope.FilesList(tab: FilesTab) {
     val coroutineScope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
 
+    LaunchedEffect(preferencesManager.showDirectoryTypeFilterRibbon, tab.activeFolder.uniquePath) {
+        if (!preferencesManager.showDirectoryTypeFilterRibbon && tab.selectedTypeFilters.isNotEmpty()) {
+            tab.selectedTypeFilters = emptySet()
+            tab.updateContentSnapshot()
+        }
+    }
+
     // Resolve parent folder once for the `..` entry
     var parentFolder by remember(tab.activeFolder.uniquePath) {
         mutableStateOf<ContentHolder?>(null)
@@ -713,18 +720,7 @@ fun FilesListColumns(
         else item.size
 
     val maxSiblingSize = if (folderScanEnabled) (snapshot.maxOfOrNull { effectiveSizeOf(it) }?.coerceAtLeast(1L) ?: tab.maxSiblingSize) else tab.maxSiblingSize
-    // IMPORTANT: We must derive listStates from `tab.activeColumnListState` as a Compose state
-    // value (not just inside remember), otherwise when we navigate back to a folder, Compose
-    // re-uses the old `remember` result (keyed on the OLD uniquePath) even though
-    // tab.activeColumnListState has been updated to the restored state.  By reading the property
-    // in a `remember` that also tracks the state *object identity* we force Compose to pick up
-    // the correct, restored LazyListState every time the folder changes.
-    val primaryColumnState = tab.activeColumnListState  // read as Compose state
-    val listStates = remember(tab.activeFolder.uniquePath, cols, primaryColumnState) {
-        List(cols) { colIndex ->
-            if (colIndex == 0) primaryColumnState else LazyListState()
-        }
-    }
+    val listStates = List(cols) { rememberLazyListState() }
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val viewConfiguration = LocalViewConfiguration.current
@@ -753,7 +749,7 @@ fun FilesListColumns(
                         (itemBottom - safeBottom).coerceAtLeast(0f)
                     } else 0f
 
-                    delay(16)
+                    delay(60)
 
                     val visibleItem = listState.layoutInfo.visibleItemsInfo.find { it.index == sliceIndex }
                     val currentViewport = listState.layoutInfo.viewportSize.height.toFloat()
@@ -815,7 +811,7 @@ fun FilesListColumns(
 
         val sliceIndex = itemInfo.index
         val globalIndex = colIndex * chunkSize + sliceIndex
-        return if (globalIndex in 0 until tab.activeFolderContent.size) globalIndex else null
+        return if (globalIndex in 0 until totalItems) globalIndex else null
     }
 
     fun getScrollStateForOffset(offset: Offset, viewportWidth: Float): LazyListState? {
@@ -839,26 +835,6 @@ fun FilesListColumns(
                 listStates[targetColumn].scrollToItem(targetIndex % chunkSize)
                 if (tab.pendingLocateFilePath == path) tab.pendingLocateFilePath = null
             }
-        }
-    }
-
-    LaunchedEffect(
-        tab.pendingScrollRestore,
-        tab.activeFolder.uniquePath,
-        snapshot.size,
-        parentFolderResolved
-    ) {
-        val restore = tab.pendingScrollRestore
-        if (restore != null && snapshot.isNotEmpty() && parentFolderResolved) {
-            val targetColumn = (restore.first / chunkSize).coerceIn(0, listStates.lastIndex)
-            val sliceIndex = restore.first % chunkSize
-            val targetState = listStates[targetColumn]
-            if (targetState.firstVisibleItemIndex != sliceIndex ||
-                kotlin.math.abs(targetState.firstVisibleItemScrollOffset - restore.second) > 10
-            ) {
-                targetState.scrollToItem(sliceIndex, restore.second)
-            }
-            tab.pendingScrollRestore = null
         }
     }
 
@@ -927,22 +903,25 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?, parentFolderResol
     LaunchedEffect(
         tab.pendingLocateFilePath,
         tab.activeFolder.uniquePath,
-        tab.activeFolderContent.size,
+        tab.contentSnapshot.size,
         parentFolder,
         parentFolderResolved
     ) {
         val path = tab.pendingLocateFilePath
         if (path != null && parentFolderResolved) {
-            val targetIndex = tab.activeFolderContent.indexOfFirst { it.uniquePath == path }
+            val targetIndex = tab.contentSnapshot.indexOfFirst { it.uniquePath == path }
             if (targetIndex >= 0) {
                 tab.activeListState.scrollToItem(targetIndex + if (parentFolder != null) 1 else 0)
                 if (tab.pendingLocateFilePath == path) tab.pendingLocateFilePath = null
+            } else if (tab.activeFolderContent.any { it.uniquePath == path } && tab.selectedTypeFilters.isNotEmpty()) {
+                tab.selectedTypeFilters = emptySet()
+                tab.updateContentSnapshot()
             }
         }
     }
 
     fun findGridItemIndex(offset: Offset): Int? {
-        if (tab.activeFolderContent.isEmpty()) return null
+        if (tab.contentSnapshot.isEmpty()) return null
         val x = offset.x.toInt()
         val y = offset.y.toInt()
         val exact = tab.activeListState.layoutInfo.visibleItemsInfo.find { info ->
@@ -956,34 +935,14 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?, parentFolderResol
         } ?: return null
 
         val contentIndex = if (parentFolder != null) itemInfo.index - 1 else itemInfo.index
-        return if (contentIndex in 0 until tab.activeFolderContent.size) contentIndex else null
+        return if (contentIndex in 0 until tab.contentSnapshot.size) contentIndex else null
     }
 
     val density = LocalDensity.current
 
-    LaunchedEffect(
-        tab.pendingScrollRestore,
-        tab.activeFolder.uniquePath,
-        tab.contentSnapshot.size,
-        parentFolderResolved
-    ) {
-        val restore = tab.pendingScrollRestore
-        if (restore != null && tab.contentSnapshot.isNotEmpty() && parentFolderResolved) {
-            val gridIndex = restore.first + if (parentFolder != null) 1 else 0
-            val maxValid = tab.contentSnapshot.size + (if (parentFolder != null) 0 else -1)
-            val validIndex = gridIndex.coerceIn(0, maxOf(0, maxValid))
-            if (tab.activeListState.firstVisibleItemIndex != validIndex ||
-                kotlin.math.abs(tab.activeListState.firstVisibleItemScrollOffset - restore.second) > 10
-            ) {
-                tab.activeListState.scrollToItem(validIndex, restore.second)
-            }
-            tab.pendingScrollRestore = null
-        }
-    }
-
     DisposableEffect(tab.activeFolder.uniquePath, tab.activeListState) {
         tab.onRequestScrollAboveRibbon = { itemIndex ->
-            if (itemIndex in 0 until tab.activeFolderContent.size) {
+            if (itemIndex in 0 until tab.contentSnapshot.size) {
                 val gridIndex = itemIndex + if (parentFolder != null) 1 else 0
                 coroutineScope.launch {
                     val isTwoRows = globalClass.preferencesManager.selectionRibbonTwoRows
@@ -1001,7 +960,7 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?, parentFolderResol
                         (itemBottom - safeBottom).coerceAtLeast(0f)
                     } else 0f
 
-                    delay(16)
+                    delay(60)
 
                     val visibleItem = tab.activeListState.layoutInfo.visibleItemsInfo.find { it.index == gridIndex }
                     val currentViewport = tab.activeListState.layoutInfo.viewportSize.height.toFloat()

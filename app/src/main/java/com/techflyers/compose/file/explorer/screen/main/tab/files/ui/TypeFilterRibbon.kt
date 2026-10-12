@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.techflyers.compose.file.explorer.App.Companion.globalClass
 import com.techflyers.compose.file.explorer.screen.main.tab.files.FilesTab
 import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.VirtualFileHolder
 
@@ -27,6 +28,7 @@ import com.techflyers.compose.file.explorer.screen.main.tab.files.holder.Virtual
 @Composable
 fun TypeFilterRibbon(tab: FilesTab) {
     if (tab.activeFolder is VirtualFileHolder) return
+    if (!globalClass.preferencesManager.showDirectoryTypeFilterRibbon) return
     if (tab.isLoading && tab.activeFolderContent.isEmpty()) return
 
     val options = listOf(
@@ -46,12 +48,19 @@ fun TypeFilterRibbon(tab: FilesTab) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val selectedFilters = tab.selectedTypeFilters
         items(options, key = { it.first ?: "all" }) { (key, label) ->
-            val selected = tab.typeFilter == key
+            val selected = if (key == null) selectedFilters.isEmpty() else key in selectedFilters
             FilterChip(
                 selected = selected,
                 onClick = {
-                    tab.typeFilter = key
+                    tab.selectedTypeFilters = if (key == null) {
+                        emptySet()
+                    } else if (key in selectedFilters) {
+                        selectedFilters - key
+                    } else {
+                        selectedFilters + key
+                    }
                     tab.updateContentSnapshot()
                 },
                 label = { Text(label, style = MaterialTheme.typography.labelMedium) },

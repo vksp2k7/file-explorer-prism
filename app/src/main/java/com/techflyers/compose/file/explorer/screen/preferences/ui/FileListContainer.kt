@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.rounded.ShortText
 import androidx.compose.material.icons.automirrored.rounded.WrapText
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.HideSource
 import androidx.compose.material.icons.rounded.Numbers
@@ -200,6 +201,16 @@ fun FileListContainer() {
             icon = Icons.Rounded.Numbers,
             switchState = prefs.showFolderContentCount,
             onSwitchChange = { prefs.showFolderContentCount = it }
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow, thickness = 3.dp)
+
+        PreferenceItem(
+            label = stringResource(R.string.show_directory_type_filter_ribbon),
+            supportingText = stringResource(R.string.show_directory_type_filter_ribbon_desc),
+            icon = Icons.Rounded.FilterList,
+            switchState = prefs.showDirectoryTypeFilterRibbon,
+            onSwitchChange = { prefs.showDirectoryTypeFilterRibbon = it }
         )
 
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow, thickness = 3.dp)

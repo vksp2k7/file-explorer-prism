@@ -131,9 +131,12 @@ class FilesTab(
     private var lastKnownCategoryMaxDate: Long = -1L
 
     fun updateContentSnapshot() {
-        val filtered = if (typeFilter != null) {
+        val activeFilters = selectedTypeFilters
+        val filtered = if (activeFilters.isNotEmpty()) {
             activeFolderContent.filter { item ->
-                item.isFolder || matchesTypeFilterExtension(item.extension, typeFilter)
+                item.isFolder || activeFilters.any { filter ->
+                    matchesTypeFilterExtension(item.extension, filter)
+                }
             }
         } else {
             activeFolderContent.toList()
@@ -143,7 +146,7 @@ class FilesTab(
     }
 
     private fun matchesTypeFilterExtension(ext: String, filter: String?): Boolean {
-        if (filter == null) return true
+        if (filter == null) return false
         val e = ext.lowercase()
         return when (filter) {
             "image" -> e in com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType.imageFileType
@@ -157,51 +160,10 @@ class FilesTab(
 
     val contentListStates = hashMapOf<String, LazyGridState>()
     var activeListState by mutableStateOf(LazyGridState())
-    val contentColumnListStates = hashMapOf<String, LazyListState>()
-    var activeColumnListState by mutableStateOf(LazyListState())
-    val savedFolderScrollPositions = hashMapOf<String, Pair<Int, Int>>()
-    var pendingScrollRestore by mutableStateOf<Pair<Int, Int>?>(null)
     var onRequestScrollAboveRibbon: ((index: Int) -> Unit)? = null
 
     fun scrollItemAboveRibbon(index: Int) {
         onRequestScrollAboveRibbon?.invoke(index)
-    }
-
-    fun getCurrentScrollPosition(): Pair<Int, Int> {
-        return if (viewConfig.viewType == ViewType.GRID) {
-            Pair(activeListState.firstVisibleItemIndex, activeListState.firstVisibleItemScrollOffset)
-        } else {
-            Pair(activeColumnListState.firstVisibleItemIndex, activeColumnListState.firstVisibleItemScrollOffset)
-        }
-    }
-
-    fun recordCurrentScrollPosition() {
-        val path = activeFolder.uniquePath
-        if (path.isNotEmpty()) {
-            savedFolderScrollPositions[path] = getCurrentScrollPosition()
-        }
-    }
-
-    fun applyFolderScrollRestore(path: String, rememberListState: Boolean, itemCount: Int) {
-        val savedPos = if (rememberListState) savedFolderScrollPositions[path] else null
-        if (savedPos != null && (savedPos.first > 0 || savedPos.second > 0) && itemCount > 0) {
-            val validIndex = savedPos.first.coerceIn(0, maxOf(0, itemCount - 1))
-            val newGridState = LazyGridState(validIndex, savedPos.second)
-            val newColumnState = LazyListState(validIndex, savedPos.second)
-            contentListStates[path] = newGridState
-            contentColumnListStates[path] = newColumnState
-            activeListState = newGridState
-            activeColumnListState = newColumnState
-            pendingScrollRestore = Pair(validIndex, savedPos.second)
-        } else {
-            val newGridState = LazyGridState(0, 0)
-            val newColumnState = LazyListState(0, 0)
-            contentListStates[path] = newGridState
-            contentColumnListStates[path] = newColumnState
-            activeListState = newGridState
-            activeColumnListState = newColumnState
-            pendingScrollRestore = null
-        }
     }
 
     var viewConfig by mutableStateOf(
@@ -221,8 +183,8 @@ class FilesTab(
     var categories = mutableStateListOf<FileListCategory>()
     var selectedCategory by mutableStateOf<FileListCategory?>(null)
     var selectedFormats by mutableStateOf<Set<String>>(emptySet())
-    /** Type filter for ordinary folders: null=All, or image/video/audio/document/archive (#75) */
-    var typeFilter by mutableStateOf<String?>(null)
+    /** Multi-select type filters for ordinary folders; an empty set means show all files. */
+    var selectedTypeFilters by mutableStateOf<Set<String>>(emptySet())
     var pendingLockPath by mutableStateOf<String?>(null)
     var pendingLockMode by mutableStateOf(com.techflyers.compose.file.explorer.screen.main.tab.files.ui.dialog.FolderLockDialogMode.UNLOCK)
     var showCreateTaskDialog by mutableStateOf(false)
@@ -390,10 +352,6 @@ class FilesTab(
             updateDisplayConfig()
             quickReloadFiles()
         }
-    }
-
-    override fun onTabStopped() {
-        recordCurrentScrollPosition()
     }
 
     override val header: String
@@ -639,11 +597,10 @@ class FilesTab(
 
         if (item != activeFolder) {
             selectedFormats = emptySet()
-            typeFilter = null
+            selectedTypeFilters = emptySet()
         }
 
         val previousFolder = activeFolder
-        recordCurrentScrollPosition()
         if (!isNavigatingHistory && item.uniquePath != previousFolder.uniquePath && previousFolder.isValid()) {
             historyBackStack.add(previousFolder)
             if (historyBackStack.size > 50) {
@@ -706,28 +663,12 @@ class FilesTab(
         // Cancel any existing listing job
         listingJob?.cancel()
 
-        // CRITICAL: activeFolderContent.clear() is called later in the listing job.
-        // When items go from N → 0, Compose's lazy layout clamps LazyListState.firstVisibleItemIndex
-        // to 0 regardless of what it was before. This silently destroys any scroll position
-        // stored in a reused state object.
-        //
-        // Solution: ALWAYS create a fresh LazyListState/LazyGridState before the content reload.
-        // For back navigation (rememberListState=true): inject the saved position directly into
-        // the constructor so the list initialises at the correct row on its very first layout pass.
-        // For forward navigation (rememberListState=false): start at top (0, 0).
-        //
-        // The constructor-based approach has NO race condition — the initial position is set before
-        // the first composition, independent of whether items have been measured yet.
-
         if (!rememberListState) {
-            savedFolderScrollPositions.remove(item.uniquePath)
-            contentListStates.remove(item.uniquePath)
-            contentColumnListStates.remove(item.uniquePath)
-            activeListState = LazyGridState(0, 0)
-            activeColumnListState = LazyListState(0, 0)
+            contentListStates[item.uniquePath] = LazyGridState(0, 0)
         }
 
-        val targetSavedPos = if (rememberListState) savedFolderScrollPositions[item.uniquePath] else null
+        activeListState = contentListStates[item.uniquePath] ?: LazyGridState()
+            .also { contentListStates[item.uniquePath] = it }
 
         // Get display config for this folder
         updateDisplayConfig()
@@ -751,23 +692,17 @@ class FilesTab(
                     }
 
                     val displayItems = if (sorted.size > 10_000) sorted.subList(0, 10_000) else sorted
-                    val initialTake = if (targetSavedPos != null && targetSavedPos.first > 0) {
-                        maxOf(256, minOf(targetSavedPos.first + 64, displayItems.size))
-                    } else {
-                        minOf(256, displayItems.size)
-                    }
-                    val firstChunk = displayItems.take(initialTake)
+                    val firstChunk = displayItems.take(256)
 
                     withContext(Dispatchers.Main) {
                         activeFolderContent.clear()
                         activeFolderContent.addAll(firstChunk)
                         updateContentSnapshot()
-                        applyFolderScrollRestore(item.uniquePath, rememberListState, firstChunk.size)
                         requestHomeToolbarUpdate()
                         postEvent()
                     }
 
-                    var offset = initialTake
+                    var offset = 256
                     val appendChunkSize = 512
                     while (isActive && offset < displayItems.size) {
                         val end = minOf(offset + appendChunkSize, displayItems.size)
@@ -797,7 +732,6 @@ class FilesTab(
                         categories.clear()
                         categories.addAll(vFolder.getCategories())
                         showCategories = categories.isNotEmpty()
-                        applyFolderScrollRestore(item.uniquePath, rememberListState, firstPage.size)
                         requestHomeToolbarUpdate()
                         postEvent()
                     }
@@ -854,7 +788,6 @@ class FilesTab(
                         foldersCount = count.folders
                         filesCount = count.files
                         showCategories = false
-                        applyFolderScrollRestore(item.uniquePath, rememberListState, sorted.size)
                         requestHomeToolbarUpdate()
                         postEvent()
                     }
