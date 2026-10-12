@@ -45,7 +45,7 @@ concurrency:
 jobs:
   build:
     name: Build release APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Check out source
@@ -105,7 +105,7 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Upload universal APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: prism-universal-release
           path: app/build/outputs/apk/release/app-universal-release.apk
