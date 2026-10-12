@@ -133,7 +133,7 @@ class FilesTab(
     fun updateContentSnapshot() {
         val filtered = if (typeFilter != null) {
             activeFolderContent.filter { item ->
-                item.isFolder() || matchesTypeFilterExtension(item.extension, typeFilter)
+                item.isFolder || matchesTypeFilterExtension(item.extension, typeFilter)
             }
         } else {
             activeFolderContent.toList()
