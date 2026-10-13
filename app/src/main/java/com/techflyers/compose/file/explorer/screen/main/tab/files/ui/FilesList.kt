@@ -77,7 +77,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.text.font.FontStyle
@@ -720,7 +719,12 @@ fun FilesListColumns(
         else item.size
 
     val maxSiblingSize = if (folderScanEnabled) (snapshot.maxOfOrNull { effectiveSizeOf(it) }?.coerceAtLeast(1L) ?: tab.maxSiblingSize) else tab.maxSiblingSize
-    val listStates = List(cols) { rememberLazyListState() }
+    val primaryColumnState = tab.activeColumnListState
+    val listStates = remember(tab.activeFolder.uniquePath, cols, primaryColumnState) {
+        List(cols) { colIndex ->
+            if (colIndex == 0) primaryColumnState else LazyListState()
+        }
+    }
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val viewConfiguration = LocalViewConfiguration.current
@@ -833,8 +837,27 @@ fun FilesListColumns(
             if (targetIndex >= 0) {
                 val targetColumn = (targetIndex / chunkSize).coerceIn(0, listStates.lastIndex)
                 listStates[targetColumn].scrollToItem(targetIndex % chunkSize)
+                tab.pendingScrollRestore = null
                 if (tab.pendingLocateFilePath == path) tab.pendingLocateFilePath = null
             }
+        }
+    }
+
+    LaunchedEffect(
+        tab.pendingScrollRestore,
+        tab.pendingLocateFilePath,
+        tab.activeFolder.uniquePath,
+        snapshot.size,
+        parentFolderResolved,
+        cols
+    ) {
+        val restore = tab.pendingScrollRestore
+        val firstColumnSize = columnSlices.firstOrNull()?.size ?: 0
+        if (restore != null && tab.pendingLocateFilePath == null && firstColumnSize > 0 && parentFolderResolved) {
+            val targetState = listStates[0]
+            val targetIndex = restore.first.coerceIn(0, firstColumnSize - 1)
+            targetState.scrollToItem(targetIndex, restore.second.coerceAtLeast(0))
+            tab.pendingScrollRestore = null
         }
     }
 
@@ -912,11 +935,29 @@ fun FilesListGrid(tab: FilesTab, parentFolder: ContentHolder?, parentFolderResol
             val targetIndex = tab.contentSnapshot.indexOfFirst { it.uniquePath == path }
             if (targetIndex >= 0) {
                 tab.activeListState.scrollToItem(targetIndex + if (parentFolder != null) 1 else 0)
+                tab.pendingScrollRestore = null
                 if (tab.pendingLocateFilePath == path) tab.pendingLocateFilePath = null
             } else if (tab.activeFolderContent.any { it.uniquePath == path } && tab.selectedTypeFilters.isNotEmpty()) {
                 tab.selectedTypeFilters = emptySet()
                 tab.updateContentSnapshot()
             }
+        }
+    }
+
+    LaunchedEffect(
+        tab.pendingScrollRestore,
+        tab.pendingLocateFilePath,
+        tab.activeFolder.uniquePath,
+        tab.contentSnapshot.size,
+        parentFolder,
+        parentFolderResolved
+    ) {
+        val restore = tab.pendingScrollRestore
+        if (restore != null && tab.pendingLocateFilePath == null && tab.contentSnapshot.isNotEmpty() && parentFolderResolved) {
+            val maxValid = tab.contentSnapshot.size + if (parentFolder != null) 0 else -1
+            val targetIndex = restore.first.coerceIn(0, maxOf(0, maxValid))
+            tab.activeListState.scrollToItem(targetIndex, restore.second.coerceAtLeast(0))
+            tab.pendingScrollRestore = null
         }
     }
 
