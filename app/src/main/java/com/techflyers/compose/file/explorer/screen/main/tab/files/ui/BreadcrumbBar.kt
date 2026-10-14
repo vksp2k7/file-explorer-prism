@@ -71,7 +71,7 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BreadcrumbBar(tab: FilesTab) {
+fun BreadcrumbBar(tab: FilesTab, showTypeFilterRibbon: Boolean = true) {
     val highlightedPathListItemColor = MaterialTheme.colorScheme.primary
 
     if (tab.showCategories) {
@@ -80,7 +80,9 @@ fun BreadcrumbBar(tab: FilesTab) {
             FormatRibbon(tab)
         }
     } else if (tab.activeFolder !is VirtualFileHolder) {
-        TypeFilterRibbon(tab)
+        if (showTypeFilterRibbon) {
+            TypeFilterRibbon(tab)
+        }
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -156,6 +158,7 @@ fun BreadcrumbBar(tab: FilesTab) {
                 itemsIndexed(tab.currentPathSegments, key = { _, it -> it.uid }) { index, item ->
                     val isHighlighted = item.uniquePath == tab.highlightedPathSegment.uniquePath
                     val isCurrentFolder = item.uniquePath == tab.activeFolder.uniquePath
+                    val isCopyHereTarget = tab.copyHereTargetFolder?.uniquePath == item.uniquePath
                     val isDropTarget = !isCurrentFolder
                     val isHovered = tab.dragDropSession?.hoveredTargetDirectory == item.uniquePath
                     val isValidTarget = tab.dragDropSession?.isValidDropTarget(item, tab.activeFolder) == true
@@ -206,6 +209,17 @@ fun BreadcrumbBar(tab: FilesTab) {
                                                 MaterialTheme.colorScheme.error,
                                                 RoundedCornerShape(8.dp)
                                             )
+                                    } else if (isCopyHereTarget) {
+                                        Modifier
+                                            .background(
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                RoundedCornerShape(8.dp)
+                                            )
                                     } else Modifier
                                 )
                                 .padding(horizontal = 2.dp)
@@ -220,13 +234,18 @@ fun BreadcrumbBar(tab: FilesTab) {
                                                 rememberSelectedFiles = true,
                                             )
                                         },
+                                        onDoubleClick = {
+                                            if (item.canAddNewContent) {
+                                                tab.toggleCopyHereMode(item)
+                                            }
+                                        },
                                         onLongClick = {
                                             item.uniquePath.copyToClipboard()
                                             showMsg(R.string.path_copied_to_clipboard)
                                         }
                                     )
                                     .padding(8.dp)
-                                    .alpha(0.8f),
+                                    .alpha(if (isCopyHereTarget) 1f else 0.8f),
                                 text = item.displayName
                                     .orIf(stringResource(id = R.string.internal_storage)) {
                                         item.uniquePath == Environment.getExternalStorageDirectory().absolutePath
@@ -235,8 +254,8 @@ fun BreadcrumbBar(tab: FilesTab) {
                                         item.uniquePath == File.separator
                                     },
                                 fontSize = 14.sp,
-                                fontWeight = if (isHighlighted) FontWeight.Medium else FontWeight.Normal,
-                                color = if (isHighlighted) highlightedPathListItemColor else Color.Unspecified
+                                fontWeight = if (isHighlighted || isCopyHereTarget) FontWeight.Medium else FontWeight.Normal,
+                                color = if (isHighlighted || isCopyHereTarget) highlightedPathListItemColor else Color.Unspecified
                             )
                         }
                     }

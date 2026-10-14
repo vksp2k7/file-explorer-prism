@@ -66,11 +66,23 @@ sealed interface PropertiesState {
         val fileHolder: ContentHolder? = null,
         val contentCount: StateFlow<String>,
         val checksum: StateFlow<String>,
+        val sha1: StateFlow<String>,
         val sha256: StateFlow<String>,
         val contentProgress: StateFlow<CalculationProgress>,
         val checksumProgress: StateFlow<CalculationProgress>,
+        val sha1Progress: StateFlow<CalculationProgress>,
         val sha256Progress: StateFlow<CalculationProgress>,
     ) : PropertiesState
+
+    data class TwoFileChecksumComparison(
+        val file1Name: String,
+        val file2Name: String,
+        val file1Md5: String,
+        val file2Md5: String,
+        val file1Sha256: String,
+        val file2Sha256: String,
+        val isMatch: Boolean
+    )
 
     data class MultipleContentProperties(
         val selectedFileCount: Int,
@@ -81,6 +93,7 @@ sealed interface PropertiesState {
         val checksumStatus: StateFlow<String>,
         val checksumProgress: StateFlow<CalculationProgress>,
         val duplicateGroups: StateFlow<List<Pair<String, List<ContentHolder>>>> = MutableStateFlow(emptyList()),
+        val twoFileComparison: StateFlow<TwoFileChecksumComparison?> = MutableStateFlow(null)
     ) : PropertiesState
 }
 
@@ -127,6 +140,11 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
                 R.string.calculating
             )
         )
+        val sha1Flow = MutableStateFlow(
+            if (file.isFolder) emptyString else globalClass.getString(
+                R.string.calculating
+            )
+        )
         val sha256Flow = MutableStateFlow(
             if (file.isFolder) emptyString else globalClass.getString(
                 R.string.calculating
@@ -134,6 +152,7 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
         )
         val contentProgressFlow = MutableStateFlow(CalculationProgress())
         val checksumProgressFlow = MutableStateFlow(CalculationProgress())
+        val sha1ProgressFlow = MutableStateFlow(CalculationProgress())
         val sha256ProgressFlow = MutableStateFlow(CalculationProgress())
 
         _uiState.update {
@@ -152,9 +171,11 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
                     fileHolder = file,
                     contentCount = contentCountFlow,
                     checksum = checksumFlow,
+                    sha1 = sha1Flow,
                     sha256 = sha256Flow,
                     contentProgress = contentProgressFlow,
                     checksumProgress = checksumProgressFlow,
+                    sha1Progress = sha1ProgressFlow,
                     sha256Progress = sha256ProgressFlow
                 )
             )
@@ -211,6 +232,26 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
                 }
             }
             activeJobs.add(job)
+            // Calculate SHA-1 with progress
+            val sha1Job = calculationScope.launch {
+                sha1ProgressFlow.value = CalculationProgress(isCalculating = true)
+                try {
+                    val sha1 = calculateSha1(file) { bytesProcessed, totalBytes, eta ->
+                        sha1ProgressFlow.value = CalculationProgress(
+                            isCalculating = true,
+                            current = bytesProcessed,
+                            total = totalBytes,
+                            etaSeconds = eta
+                        )
+                    }
+                    sha1Flow.value = sha1
+                } catch (_: Exception) {
+                    sha1Flow.value = globalClass.getString(R.string.error_calculating)
+                } finally {
+                    sha1ProgressFlow.value = CalculationProgress(isCalculating = false)
+                }
+            }
+            activeJobs.add(sha1Job)
             // Calculate SHA-256 with progress
             val sha256Job = calculationScope.launch {
                 sha256ProgressFlow.value = CalculationProgress(isCalculating = true)
@@ -233,6 +274,8 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
             activeJobs.add(sha256Job)
         } else {
             checksumFlow.value = emptyString
+            sha1Flow.value = emptyString
+            sha256Flow.value = emptyString
         }
     }
 
@@ -244,6 +287,7 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
         val checksumStatusFlow = MutableStateFlow(globalClass.getString(R.string.calculating))
         val checksumProgressFlow = MutableStateFlow(CalculationProgress())
         val duplicateGroupsFlow = MutableStateFlow<List<Pair<String, List<ContentHolder>>>>(emptyList())
+        val twoFileComparisonFlow = MutableStateFlow<PropertiesState.TwoFileChecksumComparison?>(null)
 
         _uiState.update {
             it.copy(
@@ -255,7 +299,8 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
                     sizeProgress = sizeProgressFlow,
                     checksumStatus = checksumStatusFlow,
                     checksumProgress = checksumProgressFlow,
-                    duplicateGroups = duplicateGroupsFlow
+                    duplicateGroups = duplicateGroupsFlow,
+                    twoFileComparison = twoFileComparisonFlow
                 )
             )
         }
@@ -317,14 +362,15 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
         }
         activeJobs.add(job)
 
-        calculateDuplicates(files, checksumStatusFlow, checksumProgressFlow, duplicateGroupsFlow)
+        calculateDuplicates(files, checksumStatusFlow, checksumProgressFlow, duplicateGroupsFlow, twoFileComparisonFlow)
     }
 
     private fun calculateDuplicates(
         contentHolders: List<ContentHolder>,
         checksumStatusFlow: MutableStateFlow<String>,
         checksumProgressFlow: MutableStateFlow<CalculationProgress>,
-        duplicateGroupsFlow: MutableStateFlow<List<Pair<String, List<ContentHolder>>>>
+        duplicateGroupsFlow: MutableStateFlow<List<Pair<String, List<ContentHolder>>>>,
+        twoFileComparisonFlow: MutableStateFlow<PropertiesState.TwoFileChecksumComparison?>
     ) {
         val checksumJob = calculationScope.launch {
             val localFiles = contentHolders.filterIsInstance<LocalFileHolder>().filter { !it.isFolder }
@@ -335,6 +381,7 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
             checksumProgressFlow.value =
                 CalculationProgress(isCalculating = true, total = localFiles.size.toLong(), totalFiles = localFiles.size.toLong())
             val checksumMap = mutableMapOf<String, MutableList<ContentHolder>>()
+            val md5ByPath = mutableMapOf<String, String>()
             var processed = 0L
             val startTime = System.currentTimeMillis()
             try {
@@ -358,8 +405,26 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
                     val md5 = calculateMD5WithProgress(file) { _, _, _ -> }
                     if (md5.isNotBlank() && md5 != globalClass.getString(R.string.error_calculating)) {
                         checksumMap.getOrPut(md5) { mutableListOf() }.add(file)
+                        md5ByPath[file.uniquePath] = md5
                     }
                     yield()
+                }
+                if (localFiles.size == 2) {
+                    val f1 = localFiles[0]
+                    val f2 = localFiles[1]
+                    val sha1Hash = calculateSha256(f1) { _, _, _ -> }
+                    val sha2Hash = calculateSha256(f2) { _, _, _ -> }
+                    val m1 = md5ByPath[f1.uniquePath] ?: ""
+                    val m2 = md5ByPath[f2.uniquePath] ?: ""
+                    twoFileComparisonFlow.value = PropertiesState.TwoFileChecksumComparison(
+                        file1Name = f1.displayName,
+                        file2Name = f2.displayName,
+                        file1Md5 = m1,
+                        file2Md5 = m2,
+                        file1Sha256 = sha1Hash,
+                        file2Sha256 = sha2Hash,
+                        isMatch = sha1Hash.isNotBlank() && sha1Hash == sha2Hash && m1 == m2
+                    )
                 }
                 val duplicates = checksumMap.filter { it.value.size > 1 }.map { it.key to it.value.toList() }
                 duplicateGroupsFlow.value = duplicates
@@ -489,6 +554,56 @@ class ContentPropertiesProvider(private val contentHolders: List<ContentHolder>)
 
         processDirectory(directory)
         return Triple(fileCount, folderCount, totalSize)
+    }
+
+    private suspend fun calculateSha1(
+        file: LocalFileHolder,
+        onProgress: (Long, Long, Long) -> Unit
+    ): String {
+        if (file.isFolder) return emptyString
+
+        return withContext(IO) {
+            val md = MessageDigest.getInstance("SHA-1")
+            val fileSize = file.size
+            var bytesProcessed = 0L
+            val startTime = System.currentTimeMillis()
+            var lastUpdateTime = startTime
+
+            try {
+                FileInputStream(file.file).use { fis ->
+                    val buffer = ByteArray(64 * 1024)
+                    var read: Int
+                    while (fis.read(buffer).also { read = it } isNot -1) {
+                        if (!currentCoroutineContext().isActive) break
+                        md.update(buffer, 0, read)
+                        bytesProcessed += read
+
+                        val now = System.currentTimeMillis()
+                        if (now - lastUpdateTime >= 150L || bytesProcessed == fileSize) {
+                            val elapsed = now - startTime
+                            val eta = if (elapsed > 300 && bytesProcessed > 0) {
+                                val rate = (bytesProcessed * 1000L) / elapsed
+                                if (rate > 0) (fileSize - bytesProcessed).coerceAtLeast(0L) / rate else -1L
+                            } else -1L
+                            onProgress(bytesProcessed, fileSize, eta)
+                            lastUpdateTime = now
+                        }
+
+                        if (bytesProcessed % (256 * 1024) == 0L) {
+                            yield()
+                        }
+                    }
+                }
+
+                val digest = md.digest()
+                val bigInt = BigInteger(1, digest)
+                bigInt.toString(16).padStart(40, '0')
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                globalClass.getString(R.string.error_calculating)
+            }
+        }
     }
 
     private suspend fun calculateSha256(

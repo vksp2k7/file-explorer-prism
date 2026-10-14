@@ -117,6 +117,12 @@ class PreferencesManager {
         getPreferencesKey = { booleanPreferencesKey(it) }
     )
 
+    var autoHideToolbarsLandscape by prefMutableState(
+        keyName = "autoHideToolbarsLandscape",
+        defaultValue = false,
+        getPreferencesKey = { booleanPreferencesKey(it) }
+    )
+
     var moveToolbarToBottom by prefMutableState(
         keyName = "moveToolbarToBottom",
         defaultValue = false,
@@ -336,6 +342,35 @@ class PreferencesManager {
         keyName = "drawerCollapsedSections",
         defaultValue = emptySet<String>(),
         getPreferencesKey = { stringSetPreferencesKey(it) }
+    )
+
+    private var drawerSectionsOrderJson by prefMutableState(
+        keyName = "drawerSectionsOrderJson",
+        defaultValue = "",
+        getPreferencesKey = { stringPreferencesKey(it) }
+    )
+
+    var drawerSectionsOrder: List<String>
+        get() {
+            val defaultOrder = listOf("tabs", "bookmarks", "navigation", "storage", "tools", "remote")
+            if (drawerSectionsOrderJson.isEmpty()) return defaultOrder
+            val parsed = fromJson<List<String>>(drawerSectionsOrderJson) ?: return defaultOrder
+            return (parsed.filter { it in defaultOrder } + defaultOrder.filter { it !in parsed })
+        }
+        set(value) {
+            drawerSectionsOrderJson = value.toJson()
+        }
+
+    var drawerHiddenItems by prefMutableState(
+        keyName = "drawerHiddenItems",
+        defaultValue = emptySet<String>(),
+        getPreferencesKey = { stringSetPreferencesKey(it) }
+    )
+
+    var middleSwipeZoneWidthPercent by prefMutableState(
+        keyName = "middleSwipeZoneWidthPercent",
+        defaultValue = 33,
+        getPreferencesKey = { intPreferencesKey(it) }
     )
 
     private var pinnedFilesJson by prefMutableState(

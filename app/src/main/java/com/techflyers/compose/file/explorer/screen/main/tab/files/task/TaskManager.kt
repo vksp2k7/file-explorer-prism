@@ -24,6 +24,8 @@ class TaskManager {
     private val allTasks = ConcurrentHashMap<String, Task>()
 
     var pendingTasksVersion by mutableStateOf(0)
+    var taskAddedBannerVersion by mutableStateOf(0)
+    var taskAddedBannerMessage by mutableStateOf(emptyString)
 
     val pendingTasks: MutableCollection<Task> = Collections.synchronizedList(mutableListOf<Task>())
     val runningTasks: MutableCollection<Task> = Collections.synchronizedList(mutableListOf<Task>())
@@ -44,7 +46,10 @@ class TaskManager {
         allTasks[task.id] = task
         pendingTasks.add(task)
         pendingTasksVersion++
-        if (notifyUser) globalClass.showMsg(globalClass.resources.getString(R.string.new_task_has_been_added))
+        if (notifyUser) {
+            taskAddedBannerMessage = globalClass.resources.getString(R.string.new_task_has_been_added)
+            taskAddedBannerVersion++
+        }
     }
 
     fun addTaskAndRun(task: Task, parameters: TaskParameters) {

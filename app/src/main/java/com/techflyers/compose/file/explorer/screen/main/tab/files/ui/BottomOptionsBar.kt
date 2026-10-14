@@ -260,9 +260,21 @@ fun BottomOptionsBar(tab: FilesTab, forceLandscapeOverride: Boolean = false) {
                             SelectionRibbonIconButton(
                                 tooltip = stringResource(R.string.cut),
                                 onClick = {
-                                    globalClass.taskManager.addTask(
-                                        CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = true)
-                                    )
+                                    val copyHereTarget = tab.copyHereTargetFolder
+                                        ?: globalClass.mainActivityManager.state.value.tabs
+                                            .filterIsInstance<FilesTab>()
+                                            .firstOrNull { it.copyHereTargetFolder != null }
+                                            ?.copyHereTargetFolder
+                                    if (copyHereTarget != null) {
+                                        globalClass.taskManager.addTaskAndRun(
+                                            CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = true),
+                                            CopyTaskParameters(copyHereTarget)
+                                        )
+                                    } else {
+                                        globalClass.taskManager.addTask(
+                                            CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = true)
+                                        )
+                                    }
                                     tab.unselectAllFiles()
                                 }
                             ) {
@@ -276,9 +288,21 @@ fun BottomOptionsBar(tab: FilesTab, forceLandscapeOverride: Boolean = false) {
                             SelectionRibbonIconButton(
                                 tooltip = stringResource(R.string.copy),
                                 onClick = {
-                                    globalClass.taskManager.addTask(
-                                        CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = false)
-                                    )
+                                    val copyHereTarget = tab.copyHereTargetFolder
+                                        ?: globalClass.mainActivityManager.state.value.tabs
+                                            .filterIsInstance<FilesTab>()
+                                            .firstOrNull { it.copyHereTargetFolder != null }
+                                            ?.copyHereTargetFolder
+                                    if (copyHereTarget != null) {
+                                        globalClass.taskManager.addTaskAndRun(
+                                            CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = false),
+                                            CopyTaskParameters(copyHereTarget)
+                                        )
+                                    } else {
+                                        globalClass.taskManager.addTask(
+                                            CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = false)
+                                        )
+                                    }
                                     tab.unselectAllFiles()
                                 }
                             ) {

@@ -330,9 +330,55 @@ private fun SingleFileContent(
             AsyncPropertyRow(
                 icon = Icons.Default.Fingerprint,
                 label = stringResource(R.string.sha1_checksum),
+                valueFlow = details.sha1,
+                progressFlow = details.sha1Progress
+            )
+            AsyncPropertyRow(
+                icon = Icons.Default.Fingerprint,
+                label = "SHA-256",
                 valueFlow = details.sha256,
                 progressFlow = details.sha256Progress
             )
+            if (details.fileHolder != null && details.fileHolder.isFile()) {
+                val md5Val by details.checksum.collectAsState()
+                val sha1Val by details.sha1.collectAsState()
+                val sha256Val by details.sha256.collectAsState()
+                var compareInput by remember { mutableStateOf("") }
+                val normalizedInput = compareInput.trim().lowercase()
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = compareInput,
+                    onValueChange = { compareInput = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    singleLine = true,
+                    label = { Text("Verify checksum (paste MD5 / SHA-1 / SHA-256)") },
+                    supportingText = if (normalizedInput.isNotEmpty()) {
+                        {
+                            val matchedAlgo = when {
+                                md5Val.isNotBlank() && md5Val.lowercase() == normalizedInput -> "MD5"
+                                sha1Val.isNotBlank() && sha1Val.lowercase() == normalizedInput -> "SHA-1"
+                                sha256Val.isNotBlank() && sha256Val.lowercase() == normalizedInput -> "SHA-256"
+                                else -> null
+                            }
+                            Text(
+                                text = if (matchedAlgo != null) {
+                                    "Matches $matchedAlgo checksum"
+                                } else {
+                                    "Does not match computed checksums"
+                                },
+                                color = if (matchedAlgo != null) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    } else null
+                )
+            }
         }
 
         if (details.fileHolder != null && details.fileHolder.isFile()) {
@@ -437,6 +483,57 @@ private fun MultipleFilesContent(
                 valueFlow = details.checksumStatus,
                 progressFlow = details.checksumProgress
             )
+            val twoFileComparison by details.twoFileComparison.collectAsState()
+            twoFileComparison?.let { comp ->
+                val bothMatch = comp.isMatch
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (bothMatch) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
+                        }
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (bothMatch) {
+                                "2-File Checksum Comparison: IDENTICAL"
+                            } else {
+                                "2-File Checksum Comparison: DIFFERENT"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (bothMatch) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                        Text(
+                            text = "${comp.file1Name} (MD5: ${comp.file1Md5.take(12)}..., SHA-256: ${comp.file1Sha256.take(12)}...)",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${comp.file2Name} (MD5: ${comp.file2Md5.take(12)}..., SHA-256: ${comp.file2Sha256.take(12)}...)",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
             val duplicates by details.duplicateGroups.collectAsState()
             if (duplicates.isNotEmpty()) {
                 duplicates.forEach { (hash, duplicateFiles) ->

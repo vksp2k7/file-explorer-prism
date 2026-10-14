@@ -249,11 +249,24 @@ fun AppearanceContainer() {
         )
 
         PreferenceItem(
-            label = "Auto-hide toolbars on scroll",
-            supportingText = "Toolbar and tab bar hide when scrolling down, reappear on scroll up",
+            label = "Auto-hide toolbars on scroll (Portrait)",
+            supportingText = "Toolbar and tab bar hide when scrolling down in portrait, reappear on scroll up",
             icon = Icons.Rounded.UnfoldLess,
             switchState = prefs.autoHideToolbars,
             onSwitchChange = { prefs.autoHideToolbars = it }
+        )
+
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            thickness = 3.dp
+        )
+
+        PreferenceItem(
+            label = "Auto-hide toolbars on scroll (Landscape)",
+            supportingText = "Toolbar and tab bar hide when scrolling down in landscape, reappear on scroll up",
+            icon = Icons.Rounded.UnfoldLess,
+            switchState = prefs.autoHideToolbarsLandscape,
+            onSwitchChange = { prefs.autoHideToolbarsLandscape = it }
         )
 
         HorizontalDivider(

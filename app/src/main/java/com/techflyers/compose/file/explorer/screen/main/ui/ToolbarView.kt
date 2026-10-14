@@ -174,8 +174,7 @@ fun Toolbar(
     val isFilesTab = activeTab is FilesTab
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    // In landscape, force single-row mode (disable tab bar) and disable bottom toolbar
-    val disableTabBar = globalClass.preferencesManager.disableTabBar || isLandscape
+    val disableTabBar = globalClass.preferencesManager.disableTabBar
     val buttonModifier = if (disableTabBar) Modifier.size(44.dp) else Modifier
 
     Row(
@@ -388,8 +387,8 @@ fun Toolbar(
             }
         }
 
-        // Inline breadcrumb bar in landscape mode (between title and action buttons)
-        if (isLandscape && isFilesTab) {
+        // Inline breadcrumb bar in landscape mode only when tab bar is disabled
+        if (isLandscape && isFilesTab && disableTabBar) {
             val filesTab = activeTab as FilesTab
             InlineToolbarBreadcrumb(
                 tab = filesTab,
@@ -449,6 +448,7 @@ fun SingleRowTabsControl(
     var showTabDropdown by remember { mutableStateOf(false) }
     val currentTab = tabs.getOrNull(selectedTabIndex)
     val currentLabel = (currentTab as? FilesTab)?.tabViewLabel ?: currentTab?.header ?: ""
+    val isCurrentCopyHere = (currentTab as? FilesTab)?.copyHereTargetFolder != null
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -464,6 +464,14 @@ fun SingleRowTabsControl(
                     .clickable { showTabDropdown = true }
                     .padding(horizontal = 6.dp, vertical = 4.dp)
             ) {
+                if (isCurrentCopyHere) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Rounded.MoveToInbox,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp).padding(end = 3.dp)
+                    )
+                }
                 Text(
                     text = currentLabel,
                     style = MaterialTheme.typography.titleMedium,
@@ -1233,6 +1241,11 @@ fun InlineToolbarBreadcrumb(
                                             item = item,
                                             rememberSelectedFiles = true,
                                         )
+                                    },
+                                    onDoubleClick = {
+                                        if (item.canAddNewContent) {
+                                            tab.toggleCopyHereMode(item)
+                                        }
                                     },
                                     onLongClick = {
                                         item.uniquePath.copyToClipboard()

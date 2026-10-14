@@ -32,12 +32,9 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoriesRow(tab: FilesTab) {
-    var selectedIndex by remember {
-        mutableIntStateOf(
-            tab.selectedCategory?.let {
-                tab.categories.indexOf(it) + 1
-            } ?: 0
-        )
+    val currentSelectedIndex = tab.selectedCategory?.let { tab.categories.indexOf(it) + 1 } ?: 0
+    var selectedIndex by remember(currentSelectedIndex) {
+        mutableIntStateOf(currentSelectedIndex)
     }
 
     var dragAccum by remember { mutableIntStateOf(0) }

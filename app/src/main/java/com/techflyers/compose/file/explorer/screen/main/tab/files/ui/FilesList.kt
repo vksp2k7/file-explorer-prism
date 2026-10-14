@@ -180,7 +180,73 @@ fun ColumnScope.FilesList(tab: FilesTab) {
         parentFolderResolved = true
     }
 
-    Box(Modifier.weight(1f)) {
+    val areaSwipeDensity = LocalDensity.current
+    val areaSwipeThresholdPx = with(areaSwipeDensity) { 56.dp.toPx() }
+    val areaSwipeTouchSlop = LocalViewConfiguration.current.touchSlop
+    val middleZonePercent = preferencesManager.middleSwipeZoneWidthPercent
+
+    Box(
+        Modifier
+            .weight(1f)
+            .then(
+                if (!preferencesManager.disableNavigationGestures && tab.showCategories && tab.categories.isNotEmpty()) {
+                    Modifier.pointerInput(
+                        tab.showCategories,
+                        tab.categories.size,
+                        tab.selectedCategory,
+                        middleZonePercent
+                    ) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            val middleFraction = (middleZonePercent.coerceIn(20, 70)) / 100f
+                            val leftBoundary = size.width * (1f - middleFraction) / 2f
+                            val rightBoundary = size.width * (1f + middleFraction) / 2f
+                            if (down.position.x !in leftBoundary..rightBoundary) return@awaitEachGesture
+
+                            var totalDx = 0f
+                            var totalDy = 0f
+                            var lockedHorizontal = false
+
+                            do {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val change = event.changes.find { it.id == down.id } ?: break
+                                val dx = change.position.x - change.previousPosition.x
+                                val dy = change.position.y - change.previousPosition.y
+                                totalDx += dx
+                                totalDy += dy
+
+                                if (!lockedHorizontal) {
+                                    if (kotlin.math.abs(totalDy) > areaSwipeTouchSlop && kotlin.math.abs(totalDy) > kotlin.math.abs(totalDx)) {
+                                        return@awaitEachGesture
+                                    }
+                                    if (kotlin.math.abs(totalDx) > areaSwipeTouchSlop && kotlin.math.abs(totalDx) > kotlin.math.abs(totalDy) * 1.2f) {
+                                        lockedHorizontal = true
+                                    }
+                                }
+
+                                if (lockedHorizontal) {
+                                    change.consume()
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            if (lockedHorizontal && kotlin.math.abs(totalDx) >= areaSwipeThresholdPx) {
+                                val currentIdx = tab.selectedCategory?.let { tab.categories.indexOf(it) + 1 } ?: 0
+                                val maxIdx = tab.categories.size
+                                val nextIdx = if (totalDx < 0f) {
+                                    (currentIdx + 1).coerceAtMost(maxIdx)
+                                } else {
+                                    (currentIdx - 1).coerceAtLeast(0)
+                                }
+                                if (nextIdx != currentIdx) {
+                                    tab.selectedCategory = if (nextIdx == 0) null else tab.categories.getOrNull(nextIdx - 1)
+                                    tab.reloadFiles()
+                                }
+                            }
+                        }
+                    }
+                } else Modifier
+            )
+    ) {
         if (tab.activeFolderContent.isEmpty() && !tab.isLoading) {
             EmptyFolderContent(tab)
         }
@@ -544,6 +610,67 @@ fun ColumnScope.FilesList(tab: FilesTab) {
                                     stringResource(R.string.paste_here)
                                 }
                             )
+                        }
+                    )
+                }
+            }
+        }
+
+        val copyHereTab = if (tab.copyHereTargetFolder != null) {
+            tab
+        } else {
+            globalClass.mainActivityManager.state.value.tabs
+                .filterIsInstance<FilesTab>()
+                .firstOrNull { it.copyHereTargetFolder != null }
+        }
+        val copyHereTarget = copyHereTab?.copyHereTargetFolder
+        if (copyHereTarget != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomEnd
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (tab.selectedFiles.isNotEmpty() && copyHereTarget.uniquePath != tab.activeFolder.uniquePath) {
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                taskManager.addTaskAndRun(
+                                    CopyTask(tab.selectedFiles.values.toList(), deleteSourceFiles = false),
+                                    CopyTaskParameters(copyHereTarget)
+                                )
+                                tab.unselectAllFiles()
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.ContentPaste,
+                                    contentDescription = null
+                                )
+                            },
+                            text = {
+                                Text("Copy to ${copyHereTarget.displayName}")
+                            }
+                        )
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            copyHereTab.exitCopyHereMode()
+                        },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = null
+                            )
+                        },
+                        text = {
+                            Text("Done")
                         }
                     )
                 }
@@ -1199,6 +1326,7 @@ private fun ColumnFileItem(
                     isSelected = isSelected || tab.highlightedFiles.contains(currentItemPath),
                     fontSize = fontSize.sp,
                     lineHeight = (fontSize + 2).sp,
+                    maxLines = viewConfigs.filenameMaxLines,
                     color = if (isSelected || tab.highlightedFiles.contains(currentItemPath)) {
                         colorScheme.primary
                     } else {
@@ -1367,7 +1495,7 @@ private fun GridFileItem(
                             isSelected = isSelected || tab.highlightedFiles.contains(itemPath),
                             fontSize = fontSize.sp,
                             fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                            maxLines = 2,
+                            maxLines = viewConfigs.filenameMaxLines,
                             lineHeight = (fontSize + 2).sp,
                             textAlign = TextAlign.Center,
                             color = if (tab.highlightedFiles.contains(itemPath)) {
@@ -1387,7 +1515,7 @@ private fun GridFileItem(
                     isFolder = item.isFolder,
                     isSelected = isSelected || tab.highlightedFiles.contains(itemPath),
                     fontSize = (FileItemSizeMap.getFontSize(viewConfigs.itemSize) - 3).sp,
-                    maxLines = 2,
+                    maxLines = viewConfigs.filenameMaxLines,
                     textAlign = TextAlign.Center,
                     color = if (isSelected || tab.highlightedFiles.contains(itemPath)) {
                         colorScheme.primary

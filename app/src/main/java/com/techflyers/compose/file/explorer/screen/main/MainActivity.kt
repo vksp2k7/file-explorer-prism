@@ -267,40 +267,48 @@ class MainActivity : BaseActivity() {
                         val density = androidx.compose.ui.platform.LocalDensity.current
                         val edgeSwipeThresholdPx = with(density as Density) { 24.dp.toPx() }
                         val dragThresholdPx = with(density as Density) { 48.dp.toPx() }
-                        val edgeSwipeEnabled = globalClass.preferencesManager.disableNavigationGestures
+                        val isLandscape = LocalConfiguration.current.orientation ==
+                            android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
                         Column(
                             Modifier
                                 .fillMaxSize()
-                                .then(
-                                    if (edgeSwipeEnabled) {
-                                        Modifier.pointerInput(edgeSwipeEnabled) {
-                                            awaitEachGesture {
-                                                val down = awaitFirstDown(requireUnconsumed = false)
-                                                if (down.position.x > edgeSwipeThresholdPx) return@awaitEachGesture
-                                                var totalDrag = 0f
-                                                do {
-                                                    val event = awaitPointerEvent()
-                                                    val drag = event.changes.firstOrNull()?.positionChange()?.x ?: 0f
-                                                    totalDrag += drag
-                                                    if (totalDrag > dragThresholdPx) {
-                                                        event.changes.forEach { it.consume() }
-                                                        drawerScope.launch { drawerState.open() }
-                                                        return@awaitEachGesture
-                                                    }
-                                                } while (event.changes.any { it.pressed })
+                                .pointerInput(drawerState.isOpen) {
+                                    if (drawerState.isOpen) return@pointerInput
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(
+                                            requireUnconsumed = false,
+                                            pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial
+                                        )
+                                        if (down.position.x > edgeSwipeThresholdPx) return@awaitEachGesture
+                                        var totalDrag = 0f
+                                        do {
+                                            val event = awaitPointerEvent(
+                                                androidx.compose.ui.input.pointer.PointerEventPass.Initial
+                                            )
+                                            val drag = event.changes.firstOrNull()?.positionChange()?.x ?: 0f
+                                            if (drag > 0f) {
+                                                totalDrag += drag
+                                                event.changes.forEach { it.consume() }
                                             }
-                                        }
-                                    } else Modifier
-                                )
+                                            if (totalDrag > dragThresholdPx) {
+                                                drawerScope.launch { drawerState.open() }
+                                                return@awaitEachGesture
+                                            }
+                                        } while (event.changes.any { it.pressed })
+                                    }
+                                }
                         ) {
 
                             val moveToolbarToBottom =
                                 globalClass.preferencesManager.moveToolbarToBottom
                             val moveTabsToBottom =
                                 globalClass.preferencesManager.moveTabsToBottom
-                            val autoHideToolbars =
+                            val autoHideToolbars = if (isLandscape) {
+                                globalClass.preferencesManager.autoHideToolbarsLandscape
+                            } else {
                                 globalClass.preferencesManager.autoHideToolbars
+                            }
 
                             // Track scroll direction for auto-hide
                             var toolbarsVisible by remember { mutableStateOf(true) }
@@ -442,15 +450,46 @@ class MainActivity : BaseActivity() {
     ) {
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        if (!globalClass.preferencesManager.disableTabBar && !isLandscape) {
-            TabLayout(
-                tabLayoutState = state.tabLayoutState,
-                tabs = state.tabs,
-                selectedTabIndex = state.selectedTabIndex,
-                onReorder = { from, to -> mainActivityManager.reorderTabs(from, to) },
-                onAddNewTab = { mainActivityManager.addDefaultOrOverriddenNewTab() },
-                isAtBottom = isAtBottom
-            )
+        if (!globalClass.preferencesManager.disableTabBar) {
+            val activeTab = state.tabs.getOrNull(state.selectedTabIndex)
+            if (isLandscape && activeTab is FilesTab && globalClass.preferencesManager.showPathBar) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            com.techflyers.compose.file.explorer.screen.main.tab.files.ui.BreadcrumbBar(
+                                tab = activeTab,
+                                showTypeFilterRibbon = false
+                            )
+                        }
+                        TabLayout(
+                            tabLayoutState = state.tabLayoutState,
+                            tabs = state.tabs,
+                            selectedTabIndex = state.selectedTabIndex,
+                            onReorder = { from, to -> mainActivityManager.reorderTabs(from, to) },
+                            onAddNewTab = { mainActivityManager.addDefaultOrOverriddenNewTab() },
+                            isAtBottom = isAtBottom,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (!activeTab.showCategories && activeTab.activeFolder !is com.techflyers.compose.file.explorer.screen.main.tab.files.holder.VirtualFileHolder) {
+                        com.techflyers.compose.file.explorer.screen.main.tab.files.ui.TypeFilterRibbon(activeTab)
+                    }
+                }
+            } else {
+                TabLayout(
+                    tabLayoutState = state.tabLayoutState,
+                    tabs = state.tabs,
+                    selectedTabIndex = state.selectedTabIndex,
+                    onReorder = { from, to -> mainActivityManager.reorderTabs(from, to) },
+                    onAddNewTab = { mainActivityManager.addDefaultOrOverriddenNewTab() },
+                    isAtBottom = isAtBottom
+                )
+            }
         }
     }
 
@@ -475,8 +514,9 @@ class MainActivity : BaseActivity() {
             val pagerState = rememberPagerState(initialPage = state.selectedTabIndex) {
                 state.tabs.size
             }
+            val activeTabId = state.tabs.getOrNull(state.selectedTabIndex)?.id
 
-            LaunchedEffect(state.selectedTabIndex) {
+            LaunchedEffect(state.selectedTabIndex, activeTabId) {
                 if (pagerState.currentPage isNot state.selectedTabIndex) {
                     pagerState.scrollToPage(state.selectedTabIndex)
                 }
@@ -599,35 +639,51 @@ class MainActivity : BaseActivity() {
                 }
             }
 
-            HorizontalPager(
-                state = pagerState,
-                // Disable swipe-to-switch-tab when navigation gestures are off
-                userScrollEnabled = gesturesEnabled,
+            val taskManager = globalClass.taskManager
+            val bannerVersion = taskManager.taskAddedBannerVersion
+            var showTaskBanner by remember { mutableStateOf(false) }
+            LaunchedEffect(bannerVersion) {
+                if (bannerVersion > 0) {
+                    showTaskBanner = true
+                    delay(1800)
+                    showTaskBanner = false
+                }
+            }
+
+            androidx.compose.foundation.layout.Box(
                 modifier = Modifier
                     .weight(1f)
-                    .nestedScroll(nestedScrollConnection)
-                    .then(
-                        if (extraNestedScrollConnection != null)
-                            Modifier.nestedScroll(extraNestedScrollConnection)
-                        else Modifier
-                    ),
-                key = { state.tabs[it].id }
-            ) { index ->
-                key(index) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .graphicsLayer {
-                                translationX = -overscrollAmount
-                            },
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (state.tabs.isNotEmpty()) {
-                            val currentTab = state.tabs[index]
-                            when (currentTab) {
-                                is FilesTab -> {
-                                    FilesTabContentView(currentTab)
-                                }
+                    .fillMaxWidth()
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    // Disable swipe-to-switch-tab when navigation gestures are off
+                    userScrollEnabled = gesturesEnabled,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(nestedScrollConnection)
+                        .then(
+                            if (extraNestedScrollConnection != null)
+                                Modifier.nestedScroll(extraNestedScrollConnection)
+                            else Modifier
+                        ),
+                    key = { state.tabs[it].id }
+                ) { index ->
+                    key(index) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationX = -overscrollAmount
+                                },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (state.tabs.isNotEmpty()) {
+                                val currentTab = state.tabs[index]
+                                when (currentTab) {
+                                    is FilesTab -> {
+                                        FilesTabContentView(currentTab)
+                                    }
 
                                 is HomeTab -> {
                                     HomeTabContentView(currentTab)
@@ -657,15 +713,44 @@ class MainActivity : BaseActivity() {
                                     RemoteExplorerScreen(currentTab)
                                 }
 
-                                is StorageAnalysisTab -> {
-                                    StorageAnalysisScreen(currentTab)
-                                }
+                                    is StorageAnalysisTab -> {
+                                        StorageAnalysisScreen(currentTab)
+                                    }
 
-                                is DuplicateFinderTab -> {
-                                    DuplicateFinderScreen(currentTab)
+                                    is DuplicateFinderTab -> {
+                                        DuplicateFinderScreen(currentTab)
+                                    }
                                 }
                             }
                         }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = showTaskBanner && taskManager.taskAddedBannerMessage.isNotEmpty(),
+                    enter = fadeIn(tween(150)),
+                    exit = fadeOut(tween(150)),
+                    modifier = Modifier
+                        .align(
+                            if (globalClass.preferencesManager.moveTabsToBottom) {
+                                Alignment.TopCenter
+                            } else {
+                                Alignment.BottomCenter
+                            }
+                        )
+                        .padding(vertical = 72.dp, horizontal = 24.dp)
+                ) {
+                    androidx.compose.material3.Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = androidx.compose.material3.MaterialTheme.colorScheme.inverseOnSurface,
+                        shadowElevation = 6.dp
+                    ) {
+                        Text(
+                            text = taskManager.taskAddedBannerMessage,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                        )
                     }
                 }
             }

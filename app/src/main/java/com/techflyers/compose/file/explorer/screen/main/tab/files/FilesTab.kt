@@ -295,6 +295,7 @@ class FilesTab(
     val bottomOptionsBarState = _bottomOptionsBarState.asStateFlow()
 
     var handleBackGesture by mutableStateOf(true)
+    var copyHereTargetFolder by mutableStateOf<ContentHolder?>(null)
     var tabViewLabel by mutableStateOf(createTabLabel())
 
     var isLoading by mutableStateOf(false)
@@ -553,7 +554,7 @@ class FilesTab(
                 }
             }
             return true
-        } else if (handleBackGesture) {
+        } else if (handleBackGesture && !shouldNavigateToParentTab()) {
             scope.launch {
                 val parent = activeFolder.getParent()
                 if (parent != null && parent.isValid()) {
@@ -953,8 +954,11 @@ class FilesTab(
     }
 
     private fun shouldNavigateToParentTab(folder: ContentHolder = activeFolder): Boolean {
-        return parentTab isNot null
-                && folder is ZipFileHolder
+        if (parentTab == null) return false
+        if (historyBackStack.isEmpty() && folder.uniquePath == homeDir.uniquePath) {
+            return true
+        }
+        return folder is ZipFileHolder
                 && with(folder) {
             runBlocking { getParent()?.uniquePath == zipTree.source.getParent()?.uniquePath }
         }
@@ -1309,10 +1313,25 @@ class FilesTab(
         contentListStates[activeFolder.uniquePath] = it
     }
 
+    fun toggleCopyHereMode(target: ContentHolder = activeFolder) {
+        copyHereTargetFolder = if (copyHereTargetFolder?.uniquePath == target.uniquePath) {
+            null
+        } else {
+            target
+        }
+        tabViewLabel = createTabLabel()
+    }
+
+    fun exitCopyHereMode() {
+        copyHereTargetFolder = null
+        tabViewLabel = createTabLabel()
+    }
+
     private fun createTabLabel(): String {
+        val folderForLabel = copyHereTargetFolder ?: activeFolder
         val fullName =
-            activeFolder.displayName.orIf(globalClass.getString(R.string.internal_storage)) {
-                activeFolder.uniquePath == Environment.getExternalStorageDirectory().absolutePath
+            folderForLabel.displayName.orIf(globalClass.getString(R.string.internal_storage)) {
+                folderForLabel.uniquePath == Environment.getExternalStorageDirectory().absolutePath
             }
         return if (fullName.length > 18) fullName.substring(0, 15) + "..." else fullName
     }

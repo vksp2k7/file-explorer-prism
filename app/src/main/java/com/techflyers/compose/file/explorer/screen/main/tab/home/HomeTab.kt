@@ -76,16 +76,25 @@ class HomeTab : Tab() {
         recentFilesJob = scope.launch {
             val files = getRecentFiles()
             if (isActive) {
-                recentFiles.addAll(files)
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    recentFiles.clear()
+                    recentFiles.addAll(files)
+                }
             }
         }
     }
 
     fun refreshRecentFiles() {
         recentFilesJob?.cancel()
-        recentFilesJob = null
-        recentFiles.clear()
-        fetchRecentFiles()
+        recentFilesJob = scope.launch {
+            val files = getRecentFiles()
+            if (isActive) {
+                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                    recentFiles.clear()
+                    recentFiles.addAll(files)
+                }
+            }
+        }
     }
 
     fun removeRecentFile(path: String) {
