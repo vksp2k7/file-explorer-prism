@@ -466,7 +466,7 @@ fun SingleRowTabsControl(
             ) {
                 if (isCurrentCopyHere) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Rounded.MoveToInbox,
+                        imageVector = Icons.Rounded.ContentPaste,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(15.dp).padding(end = 3.dp)
