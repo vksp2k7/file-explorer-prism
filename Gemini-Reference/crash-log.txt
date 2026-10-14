@@ -1,0 +1,253 @@
+================================================================================
+CRASH REPORT & LOGS: Prism File Explorer +
+================================================================================
+
+APPLICATION INFORMATION:
+- App Name: Prism File Explorer +
+- Package Name: com.techflyers.compose.file.explorer
+- Version: v16 (2.4)
+- Process ID (PID): 17432
+- UID: 10375
+
+DEVICE & OS INFORMATION:
+- Device Model: Samsung Galaxy M14 (m14x)
+- Build: samsung/m14xnnxx/m14x:15/AP3A.240905.015.A2/M146BXXUEDZG7:user/release-keys
+- OS Version: Android 15
+
+CRASH SUMMARY:
+- Timestamp: 2026-10-14 20:50:34.119+0530
+- Fatal Exception: java.lang.IllegalArgumentException
+- Exception Message: Key "30" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+- Trigger Action: Hardware/system back key press (KEYCODE_BACK) returning to the Home tab while another tab was active.
+
+================================================================================
+SYSTEM DROPBOX CRASH LOG (2026-10-14 20:50:34)
+================================================================================
+
+Process: com.techflyers.compose.file.explorer
+PID: 17432
+UID: 10375
+Frozen: false
+Flags: 0x30d8be44
+Package: com.techflyers.compose.file.explorer v16 (2.4)
+Foreground: Yes
+Process-Runtime: 635572
+Timestamp: 2026-10-14 20:50:34.147+0530
+Build: samsung/m14xnnxx/m14x:15/AP3A.240905.015.A2/M146BXXUEDZG7:user/release-keys
+Crash-Handler: com.techflyers.compose.file.explorer.a
+Loading-Progress: 1.0
+Dropped-Count: 0
+
+java.lang.IllegalArgumentException: Key "30" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+	at Q0.a.a(SourceFile:2)
+	at R0.D.subcompose(SourceFile:147)
+	at E.M.a(SourceFile:29)
+	at Db.a.h(SourceFile:15)
+	at C.w.J(SourceFile:22)
+	at C.r.measure-0kLqBqw(SourceFile:810)
+	at A.r.invoke(SourceFile:763)
+	at R0.F.measure-3p2s80s(SourceFile:70)
+	at T0.p.measure-BRTryo0(SourceFile:37)
+	at A0.V.measure-3p2s80s(SourceFile:0)
+	at T0.u.measure-BRTryo0(SourceFile:10)
+	at E.p.measure-3p2s80s(SourceFile:0)
+	at T0.u.measure-BRTryo0(SourceFile:10)
+	at A.t0.measure-3p2s80s(SourceFile:113)
+	at T0.u.measure-BRTryo0(SourceFile:10)
+	at T0.Q.invoke(SourceFile:128)
+	at W6.b.g(SourceFile:108)
+	at r0.t.a(SourceFile:55)
+	at r0.u.c(SourceFile:120)
+	at T0.j0.a(SourceFile:2)
+	at T0.S.n(SourceFile:39)
+	at T0.S.q(SourceFile:110)
+	at androidx.compose.ui.node.c.c(SourceFile:57)
+	at androidx.compose.ui.node.c.m(SourceFile:123)
+	at androidx.compose.ui.node.c.j(SourceFile:154)
+	at androidx.compose.ui.platform.a.r(SourceFile:35)
+	at androidx.compose.ui.node.Owner.measureAndLayout$default(SourceFile:9)
+	at androidx.compose.ui.platform.a.dispatchDraw(SourceFile:16)
+	at android.view.View.draw(View.java:26151)
+	at android.view.View.updateDisplayListIfDirty(View.java:24988)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+	at android.view.ThreadedRenderer.updateViewTreeDisplayList(ThreadedRenderer.java:737)
+	at android.view.ThreadedRenderer.updateRootDisplayList(ThreadedRenderer.java:743)
+	at android.view.ThreadedRenderer.draw(ThreadedRenderer.java:841)
+	at android.view.ViewRootImpl.draw(ViewRootImpl.java:6755)
+	at android.view.ViewRootImpl.performDraw(ViewRootImpl.java:6372)
+	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:5282)
+	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3708)
+	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:12542)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1751)
+	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1760)
+	at android.view.Choreographer.doCallbacks(Choreographer.java:1216)
+	at android.view.Choreographer.doFrame(Choreographer.java:1142)
+	at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1707)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:257)
+	at android.os.Looper.loop(Looper.java:342)
+	at android.app.ActivityThread.main(ActivityThread.java:9638)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:619)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:929)
+
+================================================================================
+LOGCAT RUNTIME LOGS (Around Crash Event)
+================================================================================
+
+10-14 20:50:33.989 I/InputDispatcher( 1365): Delivering key to (17432): B action: 0x0 (0), f=0x8, m=0x0, d=0, '5227514'
+10-14 20:50:33.991 D/SurfaceFlinger( 1063):        DEVICE |   0xb4000079c00a7e80 | 0001 | RGBA_8888    |    0.0    0.0 1080.0 2408.0 |    0    0 1080 2408 | com.techflyers.compose.file.explorer[...]creen.main.MainActivity$_17432#71858 (460)
+10-14 20:50:33.995 I/VRI[MainActivity]@beacc9(17432): ViewPostIme key 0
+10-14 20:50:33.996 D/Activity(17432): onKeyDown(KEYCODE_BACK), activity=com.techflyers.compose.file.explorer.screen.main.MainActivity@dc617a5
+10-14 20:50:33.997 I/InputDispatcher( 1365): Delivering key to (17432): B action: 0x1 (0), f=0x8, m=0x0, d=0, '5227514'
+10-14 20:50:33.998 I/VRI[MainActivity]@beacc9(17432): ViewPostIme key 1
+10-14 20:50:34.106 I/View    (17432): setRequestedFrameRate frameRate=NaN, this=androidx.compose.ui.platform.a{a20bac7 VFED..... ......ID 0,0-1080,2408 aid=1073741824}, caller=U0.e0.a:0 androidx.compose.ui.platform.a.dispatchDraw:98 android.view.View.draw:26151 android.view.View.updateDisplayListIfDirty:24988 android.view.ViewGroup.recreateChildDisplayList:4768 
+10-14 20:50:34.107 I/View    (17432): setRequestedFrameRate frameRate=-4.0, this=android.view.View{f5710a1 V.ED..... ........ 0,0-0,0}, caller=U0.e0.a:0 androidx.compose.ui.platform.a.dispatchDraw:107 android.view.View.draw:26151 android.view.View.updateDisplayListIfDirty:24988 android.view.ViewGroup.recreateChildDisplayList:4768 
+10-14 20:50:34.118 D/AndroidRuntime(17432): Shutting down VM
+--------- beginning of crash
+10-14 20:50:34.119 E/AndroidRuntime(17432): FATAL EXCEPTION: main
+10-14 20:50:34.119 E/AndroidRuntime(17432): Process: com.techflyers.compose.file.explorer, PID: 17432
+10-14 20:50:34.119 E/AndroidRuntime(17432): java.lang.IllegalArgumentException: Key "30" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at Q0.a.a(SourceFile:2)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at R0.D.subcompose(SourceFile:147)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at E.M.a(SourceFile:29)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at Db.a.h(SourceFile:15)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at C.w.J(SourceFile:22)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at C.r.measure-0kLqBqw(SourceFile:810)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at A.r.invoke(SourceFile:763)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at R0.F.measure-3p2s80s(SourceFile:70)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.p.measure-BRTryo0(SourceFile:37)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at A0.V.measure-3p2s80s(SourceFile:0)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.u.measure-BRTryo0(SourceFile:10)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at E.p.measure-3p2s80s(SourceFile:0)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.u.measure-BRTryo0(SourceFile:10)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at A.t0.measure-3p2s80s(SourceFile:113)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.u.measure-BRTryo0(SourceFile:10)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.Q.invoke(SourceFile:128)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at W6.b.g(SourceFile:108)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at r0.t.a(SourceFile:55)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at r0.u.c(SourceFile:120)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.j0.a(SourceFile:2)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.S.n(SourceFile:39)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at T0.S.q(SourceFile:110)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at androidx.compose.ui.node.c.c(SourceFile:57)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at androidx.compose.ui.node.c.m(SourceFile:123)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at androidx.compose.ui.node.c.j(SourceFile:154)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at androidx.compose.ui.platform.a.r(SourceFile:35)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at androidx.compose.ui.node.Owner.measureAndLayout$default(SourceFile:9)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at androidx.compose.ui.platform.a.dispatchDraw(SourceFile:16)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.draw(View.java:26151)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24988)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.recreateChildDisplayList(ViewGroup.java:4768)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewGroup.dispatchGetDisplayList(ViewGroup.java:4740)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.View.updateDisplayListIfDirty(View.java:24932)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ThreadedRenderer.updateViewTreeDisplayList(ThreadedRenderer.java:737)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ThreadedRenderer.updateRootDisplayList(ThreadedRenderer.java:743)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ThreadedRenderer.draw(ThreadedRenderer.java:841)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewRootImpl.draw(ViewRootImpl.java:6755)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewRootImpl.performDraw(ViewRootImpl.java:6372)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewRootImpl.performTraversals(ViewRootImpl.java:5282)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewRootImpl.doTraversal(ViewRootImpl.java:3708)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.ViewRootImpl$TraversalRunnable.run(ViewRootImpl.java:12542)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1751)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.Choreographer$CallbackRecord.run(Choreographer.java:1760)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.Choreographer.doCallbacks(Choreographer.java:1216)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.Choreographer.doFrame(Choreographer.java:1142)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:1707)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.os.Handler.handleCallback(Handler.java:959)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.os.Handler.dispatchMessage(Handler.java:100)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.os.Looper.loopOnce(Looper.java:257)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.os.Looper.loop(Looper.java:342)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at android.app.ActivityThread.main(ActivityThread.java:9638)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at java.lang.reflect.Method.invoke(Native Method)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:619)
+10-14 20:50:34.119 E/AndroidRuntime(17432): 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:929)
+10-14 20:50:34.200 I/Process (17432): Sending signal. PID: 17432 SIG: 9
+10-14 20:50:34.270 I/ActivityManager( 1365): Process com.techflyers.compose.file.explorer (pid 17432) has died: fg  TOP (170,999)
+10-14 20:50:34.270 I/Zygote  ( 1006): Process 17432 exited due to signal 9 (Killed)
+10-14 20:50:34.271 I/WindowManager( 1365): WIN DEATH: Window{5227514 u0 com.techflyers.compose.file.explorer/com.techflyers.compose.file.explorer.screen.main.MainActivity}
+10-14 20:50:34.272 I/libprocessgroup( 1365): Removed cgroup /sys/fs/cgroup/uid_10375/pid_17432
+10-14 20:50:34.277 V/BinderSender(17403): Pid 17432 dead
+
+================================================================================
+HISTORICAL CRASH OCCURRENCE (2026-10-13 11:36:05)
+================================================================================
+
+Process: com.techflyers.compose.file.explorer
+PID: 10104
+Package: com.techflyers.compose.file.explorer v16 (2.4)
+Timestamp: 2026-10-13 11:36:05.717+0530
+
+java.lang.IllegalArgumentException: Key "23" was already used. If you are using LazyColumn/Row please make sure you provide a unique key for each item.
+	at Q0.a.a(SourceFile:2)
+	at R0.D.subcompose(SourceFile:147)
+	at E.M.a(SourceFile:29)
+	at Db.a.h(SourceFile:15)
+	at C.w.J(SourceFile:22)
+	at C.r.measure-0kLqBqw(SourceFile:810)
+	at A.r.invoke(SourceFile:763)
+	at R0.F.measure-3p2s80s(SourceFile:70)
+	at T0.p.measure-BRTryo0(SourceFile:37)
+	at A0.V.measure-3p2s80s(SourceFile:0)
+	at T0.u.measure-BRTryo0(SourceFile:10)
+	at E.p.measure-3p2s80s(SourceFile:0)
+	at T0.u.measure-BRTryo0(SourceFile:10)
+	at A.t0.measure-3p2s80s(SourceFile:113)
+	at T0.u.measure-BRTryo0(SourceFile:10)
+	at T0.Q.invoke(SourceFile:128)
+	at W6.b.g(SourceFile:108)
+	at r0.t.a(SourceFile:55)
+	at r0.u.c(SourceFile:120)
+	at T0.j0.a(SourceFile:2)
+	at T0.S.n(SourceFile:39)
+	at T0.S.q(SourceFile:110)
+	at androidx.compose.ui.node.c.c(SourceFile:57)
+	at androidx.compose.ui.node.c.m(SourceFile:123)
+	at androidx.compose.ui.node.c.j(SourceFile:154)
+	at androidx.compose.ui.platform.a.r(SourceFile:35)
+	at androidx.compose.ui.node.Owner.measureAndLayout$default(SourceFile:9)
+	at C2.f.run(SourceFile:540)
+	at android.os.Handler.handleCallback(Handler.java:959)
+	at android.os.Handler.dispatchMessage(Handler.java:100)
+	at android.os.Looper.loopOnce(Looper.java:257)
+	at android.os.Looper.loop(Looper.java:342)
+	at android.app.ActivityThread.main(ActivityThread.java:9638)
