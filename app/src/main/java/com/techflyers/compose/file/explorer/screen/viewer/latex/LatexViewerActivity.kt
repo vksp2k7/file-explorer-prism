@@ -400,7 +400,7 @@ private fun LatexViewerScreen(
                             if (pdfFile.exists()) {
                                 val pdfUri = FileProvider.getUriForFile(
                                     context,
-                                    "com.techflyers.compose.file.explorer.provider",
+                                    "${context.packageName}.provider",
                                     pdfFile
                                 )
                                 val intent = Intent(context, PdfViewerActivity::class.java).apply {
@@ -559,7 +559,7 @@ private fun LatexViewerScreen(
                         LaunchedEffect(path) {
                             val pdfUri = FileProvider.getUriForFile(
                                 context,
-                                "com.techflyers.compose.file.explorer.provider",
+                                "${context.packageName}.provider",
                                 File(path)
                             )
                             val intent = Intent(context, PdfViewerActivity::class.java).apply {

@@ -1051,7 +1051,7 @@ class LocalFileHolder(
 
     internal fun createUri() = FileProvider.getUriForFile(
         globalClass,
-        "com.techflyers.compose.file.explorer.provider",
+        "${globalClass.packageName}.provider",
         file
     )
 
