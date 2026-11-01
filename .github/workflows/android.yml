@@ -99,6 +99,14 @@ jobs:
           signing.keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
+      # Keep the repository app sources unchanged. Patch only this CI checkout
+      # so the side-by-side pre-release APK has unique provider authorities.
+      - name: Isolate pre-release provider authorities
+        run: |
+          sed -i 's#android:authorities="com.techflyers.compose.file.explorer.provider"#android:authorities="${applicationId}.provider"#' app/src/main/AndroidManifest.xml
+          sed -i 's#"com.techflyers.compose.file.explorer.provider"#"${globalClass.packageName}.provider"#' app/src/main/java/com/techflyers/compose/file/explorer/screen/main/tab/files/holder/LocalFileHolder.kt
+          sed -i 's#"com.techflyers.compose.file.explorer.provider"#"${context.packageName}.provider"#g' app/src/main/java/com/techflyers/compose/file/explorer/screen/viewer/latex/LatexViewerActivity.kt
+
       # The preRelease build type is minified and uses release signing, while
       # its application ID suffix allows it to be installed beside production.
       - name: Build pre-release APK
