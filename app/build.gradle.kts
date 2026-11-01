@@ -71,6 +71,7 @@ android {
             initWith(getByName("release"))
             applicationIdSuffix = ".prerelease"
             versionNameSuffix = "-pre-release"
+            matchingFallbacks += listOf("release")
         }
     }
 
