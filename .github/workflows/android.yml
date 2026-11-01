@@ -44,7 +44,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build release APK
+    name: Build pre-release APK
     runs-on: ubuntu-24.04
 
     steps:
@@ -99,16 +99,16 @@ jobs:
           signing.keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
-      # If no release keystore secrets are configured, the app's Gradle script
-      # falls back to the runner debug keystore for test-only APKs.
-      - name: Build release APK
-        run: ./gradlew --no-daemon --stacktrace assembleRelease
+      # The preRelease build type is minified and uses release signing, while
+      # its application ID suffix allows it to be installed beside production.
+      - name: Build pre-release APK
+        run: ./gradlew --no-daemon --stacktrace assemblePreRelease
 
       - name: Upload universal APK
         uses: actions/upload-artifact@v7
         with:
-          name: prism-universal-release
-          path: app/build/outputs/apk/release/app-universal-release.apk
+          name: prism-universal-pre-release
+          path: app/build/outputs/apk/preRelease/app-universal-preRelease.apk
           if-no-files-found: error
 
       - name: Clean up signing material
