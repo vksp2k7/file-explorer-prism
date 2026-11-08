@@ -108,19 +108,8 @@ jobs:
 
           path = Path("app/build.gradle.kts")
           source = path.read_text()
-          marker = '''        }
-    }
-
-    packaging {'''
-          pre_release = '''        }
-        create("preRelease") {
-            initWith(getByName("release"))
-            applicationIdSuffix = ".prerelease"
-            versionNameSuffix = "-pre-release"
-            matchingFallbacks += listOf("release")
-        }
-    }
-    packaging {'''
+          marker = "        }\n    }\n\n    packaging {"
+          pre_release = "        }\n        create(\"preRelease\") {\n            initWith(getByName(\"release\"))\n            applicationIdSuffix = \".prerelease\"\n            versionNameSuffix = \"-pre-release\"\n            matchingFallbacks += listOf(\"release\")\n        }\n    }\n\n    packaging {"
           if source.count(marker) != 1:
               raise SystemExit("Could not find the expected buildTypes insertion point")
           path.write_text(source.replace(marker, pre_release, 1))
