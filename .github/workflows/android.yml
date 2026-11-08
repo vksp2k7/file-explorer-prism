@@ -103,6 +103,28 @@ jobs:
       # so the side-by-side pre-release APK has unique provider authorities.
       - name: Isolate pre-release provider authorities
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("app/build.gradle.kts")
+          source = path.read_text()
+          marker = '''        }
+    }
+
+    packaging {'''
+          pre_release = '''        }
+        create("preRelease") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".prerelease"
+            versionNameSuffix = "-pre-release"
+            matchingFallbacks += listOf("release")
+        }
+    }
+    packaging {'''
+          if source.count(marker) != 1:
+              raise SystemExit("Could not find the expected buildTypes insertion point")
+          path.write_text(source.replace(marker, pre_release, 1))
+          PY
           sed -i 's#android:authorities="com.techflyers.compose.file.explorer.provider"#android:authorities="${applicationId}.provider"#' app/src/main/AndroidManifest.xml
           sed -i 's#"com.techflyers.compose.file.explorer.provider"#"${globalClass.packageName}.provider"#' app/src/main/java/com/techflyers/compose/file/explorer/screen/main/tab/files/holder/LocalFileHolder.kt
           sed -i 's#"com.techflyers.compose.file.explorer.provider"#"${context.packageName}.provider"#g' app/src/main/java/com/techflyers/compose/file/explorer/screen/viewer/latex/LatexViewerActivity.kt

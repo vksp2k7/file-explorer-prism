@@ -67,12 +67,6 @@ android {
                 "proguard-rules.pro"
             )
         }
-        create("preRelease") {
-            initWith(getByName("release"))
-            applicationIdSuffix = ".prerelease"
-            versionNameSuffix = "-pre-release"
-            matchingFallbacks += listOf("release")
-        }
     }
 
     packaging {
