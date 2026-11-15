@@ -1,0 +1,311 @@
+name: Release
+
+# How to release
+#   Actions -> Release -> Run workflow (from the default branch).
+#   * bump = auto      : major if an item is labelled "breaking", minor if labelled
+#                        "enhancement"/"feature", otherwise patch.
+#   * version          : optional explicit version (e.g. 2.6) - overrides bump.
+#   * dry_run          : build + generate notes, but do not tag or publish.
+#   You can also push a tag such as v2.6 yourself; the workflow then releases that tag.
+#
+# First release (no v* tag yet) uses versionName from app/build.gradle.kts.
+#
+# Required secrets (same ones android.yml already uses):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# Optional repository variable:
+#   RELEASE_NOTES_MODEL  (GitHub Models id, default openai/gpt-4.1)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump (ignored when 'version' is set or the first release is made)"
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      version:
+        description: "Explicit version, e.g. 2.6 or 2.6.1 (optional)"
+        type: string
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark the GitHub release as a pre-release"
+        type: boolean
+        default: false
+      draft:
+        description: "Create the release as a draft"
+        type: boolean
+        default: false
+      ai_notes:
+        description: "Write release notes with AI (GitHub Models)"
+        type: boolean
+        default: true
+      dry_run:
+        description: "Build and generate notes only; do not tag or publish"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  APP_NAME: Prism-File-Explorer
+  BUILD_TOOLS: "36.0.0"
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Work out version + collect resolved issues + write release notes
+  # --------------------------------------------------------------------------
+  prepare:
+    name: Version and release notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      models: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      version_code: ${{ steps.version.outputs.version_code }}
+    steps:
+      - name: Only release from the default branch
+        if: ${{ github.ref_type == 'branch' && github.ref_name != github.event.repository.default_branch && github.event.inputs.dry_run != 'true' }}
+        run: |
+          echo "::error::Run releases from '${{ github.event.repository.default_branch }}' (or enable dry_run)."
+          exit 1
+
+      - name: Check out source (full history and tags)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Collect issues, pull requests and commits since the last release
+        run: python3 .github/scripts/release_tool.py collect --out release-evidence.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+
+      - name: Calculate version
+        id: version
+        run: python3 .github/scripts/release_tool.py version --evidence release-evidence.json
+        env:
+          BUMP: ${{ github.event.inputs.bump }}
+          VERSION_OVERRIDE: ${{ github.event.inputs.version }}
+
+      - name: Generate release notes
+        run: |
+          python3 .github/scripts/release_tool.py notes \
+            --evidence release-evidence.json \
+            --version "${{ steps.version.outputs.version }}" \
+            --out release-notes.md
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          AI_NOTES: ${{ github.event.inputs.ai_notes }}
+          RELEASE_NOTES_MODEL: ${{ vars.RELEASE_NOTES_MODEL }}
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-meta
+          path: |
+            release-notes.md
+            release-evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # --------------------------------------------------------------------------
+  # 2. Build signed release APKs (one per ABI + universal)
+  # --------------------------------------------------------------------------
+  build:
+    name: Build APKs
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;28.2.13676358
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x ./gradlew
+
+      - name: Remove machine-specific Gradle Java home
+        run: sed -i '/^org\.gradle\.java\.home=/d' gradle.properties
+
+      # A release signed with a throw-away debug key could never be updated by
+      # users, so refuse to continue without the real keystore.
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository secret $name. Releases must be signed with the real keystore."
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/prism-release.jks"
+          cat >> local.properties <<EOF
+          signing.storeFilePath=$GITHUB_WORKSPACE/prism-release.jks
+          signing.storePassword=$ANDROID_KEYSTORE_PASSWORD
+          signing.keyAlias=$ANDROID_KEY_ALIAS
+          signing.keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      # The repository keeps its own versionName/versionCode; only this CI
+      # checkout is stamped with the release version.
+      - name: Stamp release version
+        run: |
+          python3 .github/scripts/release_tool.py stamp \
+            --gradle app/build.gradle.kts \
+            --name "$VERSION" \
+            --code "$VERSION_CODE"
+
+      - name: Build release APKs
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
+
+      - name: Verify, rename and checksum APKs
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          BT="$SDK/build-tools/$BUILD_TOOLS"
+          SRC=app/build/outputs/apk/release
+          mkdir -p dist
+          ref_cert=""
+          for abi in arm64-v8a armeabi-v7a x86_64 x86 universal; do
+            apk="$SRC/app-$abi-release.apk"
+            if [ ! -f "$apk" ]; then
+              echo "::error::Expected APK not found: $apk"
+              ls -la "$SRC" || true
+              exit 1
+            fi
+            "$BT/apksigner" verify "$apk"
+            certs="$("$BT/apksigner" verify --print-certs "$apk")"
+            if grep -q "CN=Android Debug" <<<"$certs"; then
+              echo "::error::$abi APK is signed with the Android debug key"
+              exit 1
+            fi
+            cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<<"$certs" | head -n1)"
+            if [ -z "$cert" ]; then
+              echo "::error::Could not read signing certificate of $apk"
+              exit 1
+            fi
+            if [ -z "$ref_cert" ]; then
+              ref_cert="$cert"
+            elif [ "$cert" != "$ref_cert" ]; then
+              echo "::error::$abi APK is signed with a different certificate"
+              exit 1
+            fi
+            badging="$("$BT/aapt2" dump badging "$apk" | sed -n '1p')"
+            if ! grep -q "versionCode='$VERSION_CODE'" <<<"$badging" || ! grep -q "versionName='$VERSION'" <<<"$badging"; then
+              echo "::error::$abi APK has unexpected version info: $badging"
+              exit 1
+            fi
+            cp "$apk" "dist/$APP_NAME-$TAG-$abi.apk"
+          done
+          (cd dist && sha256sum ./*.apk | sed 's# \./# #' > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          {
+            echo "### APKs for $TAG"
+            echo '```'
+            ls -lh dist | tail -n +2
+            echo '```'
+            echo "Signing certificate SHA-256: \`$ref_cert\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-apks
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Clean up signing material
+        if: ${{ always() }}
+        run: rm -f local.properties prism-release.jks
+
+  # --------------------------------------------------------------------------
+  # 3. Tag + publish the GitHub release
+  # --------------------------------------------------------------------------
+  publish:
+    name: Publish GitHub release
+    needs: [prepare, build]
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      PRERELEASE: ${{ github.event.inputs.prerelease }}
+      DRAFT: ${{ github.event.inputs.draft }}
+    steps:
+      - name: Download release notes
+        uses: actions/download-artifact@v8
+        with:
+          name: release-meta
+          path: dist/meta
+
+      - name: Download APKs
+        uses: actions/download-artifact@v8
+        with:
+          name: release-apks
+          path: dist/apks
+
+      # The tag is created here, at the exact commit that was built, so a failed
+      # build never leaves a dangling tag. Re-running the job is safe: an existing
+      # release is updated and its assets replaced.
+      - name: Create tag and release
+        run: |
+          set -euo pipefail
+          TITLE="${APP_NAME//-/ } $TAG"
+          NOTES="dist/meta/release-notes.md"
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - updating notes and assets."
+            gh release edit "$TAG" --repo "$REPO" --title "$TITLE" --notes-file "$NOTES"
+            gh release upload "$TAG" dist/apks/* --repo "$REPO" --clobber
+          else
+            args=(--repo "$REPO" --title "$TITLE" --notes-file "$NOTES" --target "$GITHUB_SHA")
+            if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi
+            if [ "$DRAFT" = "true" ]; then args+=(--draft); fi
+            gh release create "$TAG" dist/apks/* "${args[@]}"
+          fi
+          URL="$(gh release view "$TAG" --repo "$REPO" --json url --jq .url)"
+          echo "### Released [$TAG]($URL)" >> "$GITHUB_STEP_SUMMARY"

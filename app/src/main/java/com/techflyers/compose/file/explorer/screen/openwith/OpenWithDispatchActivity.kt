@@ -1,0 +1,552 @@
+package com.techflyers.compose.file.explorer.screen.openwith
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.provider.OpenableColumns
+import android.widget.Toast
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
+import com.techflyers.compose.file.explorer.App.Companion.globalClass
+import com.techflyers.compose.file.explorer.R
+import com.techflyers.compose.file.explorer.base.BaseActivity
+import com.techflyers.compose.file.explorer.common.MimeTypeDetector
+import com.techflyers.compose.file.explorer.common.magika.MagikaFileTypeDetector
+import com.techflyers.compose.file.explorer.common.resolveUriToPath
+import com.techflyers.compose.file.explorer.common.ui.SafeSurface
+import com.techflyers.compose.file.explorer.screen.main.MainActivity
+import com.techflyers.compose.file.explorer.screen.main.tab.files.misc.FileMimeType
+import com.techflyers.compose.file.explorer.screen.viewer.audio.AudioPlayerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.comic.ComicViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.djvu.DjvuViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.document.DocumentViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.epub.EpubViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.html.HtmlViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.image.ImageViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.latex.LatexViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.markdown.MarkdownViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.pdf.PdfViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.spreadsheet.SpreadsheetViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.text.TextViewerActivity
+import com.techflyers.compose.file.explorer.screen.viewer.video.VideoPlayerActivity
+import com.techflyers.compose.file.explorer.theme.FileExplorerTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+
+class OpenWithDispatchActivity : BaseActivity() {
+
+    companion object {
+        const val EXTRA_OPEN_ARCHIVE = "extra_open_archive"
+        const val EXTRA_OPEN_APK = "extra_open_apk"
+        const val EXTRA_OPEN_PREFS = "extra_open_prefs"
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        checkPermissions()
+    }
+
+    override fun onPermissionGranted() {
+        val uri = extractUri()
+        if (uri == null) {
+            Toast.makeText(this, R.string.file_not_found, Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        setContent {
+            FileExplorerTheme {
+                SafeSurface {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = stringResource(R.string.opening_file),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            try {
+                dispatchUri(uri)
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@OpenWithDispatchActivity, "Error opening file: ${e.message}", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            }
+        }
+    }
+
+    private fun extractUri(): Uri? {
+        val i = intent ?: return null
+        if (i.data != null) return i.data
+
+        val streamUri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            i.getParcelableExtra(Intent.EXTRA_STREAM)
+        }
+        if (streamUri != null) return streamUri
+
+        val clipUri = i.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+        if (clipUri != null) return clipUri
+
+        return null
+    }
+
+    private suspend fun dispatchUri(uri: Uri) {
+        val (fileName, localFile) = withContext(Dispatchers.IO) {
+            resolveFileAndName(uri)
+        }
+
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        val rawMime = intent.type?.takeIf { it.isNotBlank() && it != "*/*" && it != "application/octet-stream" }
+        val mimeType = rawMime ?: getMimeType(uri, localFile, extension)
+
+        withContext(Dispatchers.Main) {
+            routeFile(uri, fileName, extension, mimeType, localFile)
+        }
+    }
+
+    private fun resolveFileAndName(uri: Uri): Pair<String, File?> {
+        var resolvedName: String? = null
+        var localFile: File? = null
+
+        if (uri.scheme == "file") {
+            val path = uri.path
+            if (path != null) {
+                localFile = File(path)
+                resolvedName = localFile.name
+            }
+        }
+
+        if (localFile == null || !localFile.exists()) {
+            val resolvedPath = resolveUriToPath(this, uri, null)
+            if (resolvedPath.isNotEmpty()) {
+                val candidate = File(resolvedPath)
+                if (candidate.exists()) {
+                    localFile = candidate
+                    resolvedName = candidate.name
+                }
+            }
+        }
+
+        if (resolvedName.isNullOrEmpty() && uri.scheme == "content") {
+            try {
+                contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex >= 0) {
+                            resolvedName = cursor.getString(nameIndex)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (resolvedName.isNullOrEmpty()) {
+            resolvedName = uri.lastPathSegment ?: "unknown_file"
+        }
+
+        return Pair(resolvedName!!, localFile)
+    }
+
+    private fun getMimeType(uri: Uri, file: File?, extension: String): String {
+        if (uri.scheme == "content") {
+            val type = contentResolver.getType(uri)
+            if (!type.isNullOrEmpty()) return type
+        }
+
+        if (extension.isNotEmpty()) {
+            val type = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            if (!type.isNullOrEmpty()) return type
+        }
+
+        if (file != null && file.exists()) {
+            val detected = MimeTypeDetector.detect(file)
+            if (detected != null) return detected.mimeType
+        }
+
+        return "application/octet-stream"
+    }
+
+    private suspend fun routeFile(
+        uri: Uri,
+        fileName: String,
+        extension: String,
+        mimeType: String,
+        localFile: File?
+    ) {
+        val lowerExt = extension.lowercase()
+
+        // 1. PDF
+        if (lowerExt == "pdf" || mimeType == "application/pdf") {
+            startViewer(PdfViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 2. Images
+        if (FileMimeType.imageFileType.contains(lowerExt) ||
+            FileMimeType.vectorFileType.contains(lowerExt) ||
+            mimeType.startsWith("image/")
+        ) {
+            startViewer(ImageViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 3. Audio
+        if (FileMimeType.audioFileType.contains(lowerExt) || mimeType.startsWith("audio/")) {
+            startViewer(AudioPlayerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 4. Video
+        if (FileMimeType.videoFileType.contains(lowerExt) || mimeType.startsWith("video/")) {
+            startViewer(VideoPlayerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 5. LaTeX
+        if (FileMimeType.latexFileType.contains(lowerExt) ||
+            mimeType == "text/x-tex" || mimeType == "application/x-latex"
+        ) {
+            startViewer(LatexViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 6. Markdown
+        if (lowerExt == "md" || lowerExt == "markdown" ||
+            mimeType == "text/markdown" || mimeType == "text/x-markdown"
+        ) {
+            startViewer(MarkdownViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 7. HTML
+        if (FileMimeType.htmlFileType.contains(lowerExt) || mimeType == "text/html") {
+            startViewer(HtmlViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 8. DJVU Documents -> route to DjvuViewerActivity
+        if (FileMimeType.djvuFileTypes.contains(lowerExt) ||
+            mimeType in setOf("image/vnd.djvu", "image/djvu", "image/x-djvu")
+        ) {
+            startViewer(DjvuViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 9. E-books (EPUB, MOBI, AZW, AZW3, PRC, RTF, ODT, FB2) -> route to EpubViewerActivity
+        if (FileMimeType.ebookFileType.contains(lowerExt) ||
+            fileName.lowercase().endsWith(".fb2.zip") ||
+            mimeType in setOf(
+                "application/epub+zip",
+                "application/x-mobipocket-ebook",
+                "application/vnd.amazon.mobi",
+                "application/x-fictionbook+xml",
+                "application/rtf",
+                "text/rtf"
+            )
+        ) {
+            startViewer(EpubViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 10. Spreadsheets (.xlsx, .xls, .xlsm, .csv, .tsv, etc.)
+        if (FileMimeType.excelFileType.contains(lowerExt) ||
+            lowerExt in setOf("csv", "tsv", "xlsm", "xlt", "xltx") ||
+            mimeType in setOf(
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel.sheet.macroEnabled.12",
+                "text/csv",
+                "text/comma-separated-values",
+                "text/tab-separated-values",
+                "application/vnd.oasis.opendocument.spreadsheet"
+            )
+        ) {
+            startViewer(SpreadsheetViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 11. Office Documents
+        if (FileMimeType.officeFileType.contains(lowerExt) ||
+            lowerExt in setOf("ods", "odp") ||
+            mimeType in setOf(
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
+        ) {
+            startViewer(DocumentViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 9. APK & APK Bundles -> route to MainActivity APK preview/dialog
+        if (FileMimeType.apkFileType == lowerExt ||
+            FileMimeType.apkBundleFileType.contains(lowerExt) ||
+            mimeType == "application/vnd.android.package-archive"
+        ) {
+            val targetFile = ensureLocalFile(uri, fileName, localFile)
+            if (targetFile != null) {
+                val mainIntent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(EXTRA_OPEN_APK, targetFile.absolutePath)
+                }
+                startActivity(mainIntent)
+            } else {
+                Toast.makeText(this, R.string.invalid_apk_file, Toast.LENGTH_SHORT).show()
+            }
+            finish()
+            return
+        }
+
+        // 10. Prism Preferences -> route to MainActivity import dialog
+        if (FileMimeType.prismPrefsFileType == lowerExt) {
+            val targetFile = ensureLocalFile(uri, fileName, localFile)
+            if (targetFile != null) {
+                val mainIntent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(EXTRA_OPEN_PREFS, targetFile.absolutePath)
+                }
+                startActivity(mainIntent)
+            } else {
+                Toast.makeText(this, R.string.invalid_preferences_file, Toast.LENGTH_SHORT).show()
+            }
+            finish()
+            return
+        }
+
+        // 11. Comic Book Archives -> route to ComicViewerActivity
+        if (FileMimeType.comicFileType.contains(lowerExt) ||
+            mimeType in setOf(
+                "application/vnd.comicbook+zip",
+                "application/vnd.comicbook-rar",
+                "application/x-cbz",
+                "application/x-cbr",
+                "application/x-cb7",
+                "application/x-cbt"
+            )
+        ) {
+            startViewer(ComicViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+
+
+        // 13. Archive formats -> route to MainActivity archive browser (ZipManager)
+        if (FileMimeType.supportedArchiveFileType.contains(lowerExt) ||
+            FileMimeType.archiveFileType.contains(lowerExt) ||
+            isTarCompressed(fileName) ||
+            com.techflyers.compose.file.explorer.screen.main.tab.files.zip.ArchiveManager.isSplitArchivePart(fileName) ||
+            isArchiveMimeType(mimeType)
+        ) {
+            val targetFile = ensureLocalFile(uri, fileName, localFile)
+            if (targetFile != null) {
+                val mainIntent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(EXTRA_OPEN_ARCHIVE, targetFile.absolutePath)
+                }
+                startActivity(mainIntent)
+            } else {
+                Toast.makeText(this, R.string.invalid_zip, Toast.LENGTH_SHORT).show()
+            }
+            finish()
+            return
+        }
+
+        // 12. Text & Code files -> route to TextViewerActivity
+        if (FileMimeType.codeFileType.contains(lowerExt) ||
+            FileMimeType.editableFileType.contains(lowerExt) ||
+            MimeTypeDetector.isTextMimeType(mimeType) ||
+            mimeType.startsWith("text/")
+        ) {
+            startViewer(TextViewerActivity::class.java, uri, mimeType, localFile)
+            return
+        }
+
+        // 13. Magika Content-Based Fallback
+        val ensuredFile = ensureLocalFile(uri, fileName, localFile)
+        if (ensuredFile != null) {
+            val detected = MagikaFileTypeDetector.detect(ensuredFile)
+            if (detected != null) {
+                val label = detected.label
+                val detectedMime = detected.mimeType
+                when {
+                    label in setOf("html") || detectedMime == "text/html" -> {
+                        startViewer(HtmlViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("markdown") || detectedMime == "text/markdown" -> {
+                        startViewer(MarkdownViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("latex") || detectedMime.contains("tex") -> {
+                        startViewer(LatexViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("pdf") || detectedMime == "application/pdf" -> {
+                        startViewer(PdfViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    detectedMime.startsWith("image/") || label in setOf("png", "jpeg", "gif", "webp", "bmp", "tiff", "svg", "ico") -> {
+                        startViewer(ImageViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    detectedMime.startsWith("video/") || label in setOf("mp4", "qt", "mov", "mkv", "webm", "flv", "3gp", "avi", "wmv", "asf", "mpeg", "mpg", "vob", "ts", "m2ts", "ogv") -> {
+                        startViewer(VideoPlayerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    detectedMime.startsWith("audio/") || label in setOf("mp3", "m4a", "m4b", "aac", "wav", "ogg", "oga", "opus", "flac", "wma", "aiff", "amr", "ac3", "midi") -> {
+                        startViewer(AudioPlayerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("xls", "xlsx", "xlsm", "xlt", "xltx", "csv", "tsv", "ods") ||
+                        detectedMime in setOf(
+                            "application/vnd.ms-excel",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "application/vnd.ms-excel.sheet.macroEnabled.12",
+                            "text/csv",
+                            "text/comma-separated-values",
+                            "text/tab-separated-values",
+                            "application/vnd.oasis.opendocument.spreadsheet"
+                        ) -> {
+                        startViewer(SpreadsheetViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("doc", "docx", "ppt", "pptx", "odt", "odp") -> {
+                        startViewer(DocumentViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label == "epub" || detectedMime == "application/epub+zip" ||
+                    label in setOf("mobi", "azw", "azw3", "rtf", "odt", "fb2") -> {
+                        startViewer(EpubViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("djvu") || detectedMime in setOf("image/vnd.djvu", "image/djvu", "image/x-djvu") -> {
+                        startViewer(DjvuViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    label in setOf("cbz", "cbr", "cb7", "cbt") || detectedMime in setOf(
+                        "application/vnd.comicbook+zip", "application/vnd.comicbook-rar",
+                        "application/x-cbz", "application/x-cbr", "application/x-cb7", "application/x-cbt"
+                    ) -> {
+                        startViewer(ComicViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                    detectedMime.contains("zip") || detectedMime.contains("archive") ||
+                            label in setOf("zip", "jar", "apk", "gzip", "bzip", "sevenzip", "rar", "tar", "xz", "iso", "dmg", "cab", "zst", "zstd", "lz4") -> {
+                        val mainIntent = Intent(this, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            putExtra(EXTRA_OPEN_ARCHIVE, ensuredFile.absolutePath)
+                        }
+                        startActivity(mainIntent)
+                        finish()
+                        return
+                    }
+                    detected.isText || MimeTypeDetector.isTextMimeType(detectedMime) -> {
+                        startViewer(TextViewerActivity::class.java, uri, detectedMime, ensuredFile)
+                        return
+                    }
+                }
+            }
+        }
+
+        // 14. Ultimate Fallback: Try Text Viewer
+        startViewer(TextViewerActivity::class.java, uri, mimeType, localFile)
+    }
+
+    private fun startViewer(
+        activityClass: Class<*>,
+        uri: Uri,
+        mimeType: String,
+        localFile: File?
+    ) {
+        val viewerIntent = Intent(this, activityClass).apply {
+            action = Intent.ACTION_VIEW
+            setDataAndType(uri, mimeType)
+            clipData = android.content.ClipData.newRawUri("", uri)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
+                        Intent.FLAG_ACTIVITY_MULTIPLE_TASK or
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            localFile?.let { putExtra("extra_file_path", it.absolutePath) }
+        }
+        try {
+            startActivity(viewerIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open file: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+        finish()
+    }
+
+    private suspend fun ensureLocalFile(uri: Uri, fileName: String, existingFile: File?): File? {
+        if (existingFile != null && existingFile.exists()) return existingFile
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val tempDir = File(cacheDir, "open_with_cache").apply { mkdirs() }
+                val safeFileName = fileName.substringAfterLast('/').substringAfterLast('\\').ifBlank { "file_${System.currentTimeMillis()}" }
+                val targetFile = File(tempDir, safeFileName)
+                contentResolver.openInputStream(uri)?.use { input ->
+                    targetFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (targetFile.exists()) targetFile else null
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    private fun isTarCompressed(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower.endsWith(".tar.gz") || lower.endsWith(".tar.bz2") ||
+                lower.endsWith(".tar.bzip2") || lower.endsWith(".tar.xz") ||
+                lower.endsWith(".tar.zst") || lower.endsWith(".tar.zstd") ||
+                lower.endsWith(".tar.lz4") || lower.endsWith(".tar.lz") ||
+                lower.endsWith(".tgz") || lower.endsWith(".tbz2") ||
+                lower.endsWith(".tbz") || lower.endsWith(".txz") ||
+                lower.endsWith(".tzst") || lower.endsWith(".tpz")
+    }
+
+    private fun isArchiveMimeType(mime: String): Boolean {
+        return mime.contains("zip") || mime.contains("archive") ||
+                mime.contains("7z") || mime.contains("rar") ||
+                mime.contains("tar") || mime.contains("gzip") ||
+                mime.contains("bzip") || mime.contains("xz") ||
+                mime.contains("iso") || mime.contains("zstd") ||
+                mime.contains("lz4")
+    }
+}
